@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# 本机 ROS 2 工作区产物（源码 ros2_ws/src 入库）
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# vendored SDK（体积大，按 docs/ros2-setup.md 获取）
+third_party/
+
+# 闭环 / 评测日志
+logs/
+
+# 策略等价性回归样本（每个 4-5 MB；只在导出机器上生成）
+*.equiv.npz
+
+# 观察器录制的 CSV / 图片
+logs/**/*.csv
+
+# 策略等价性样本：保留测试与默认策略两份，其余不入库
+*.equiv.npz
+!ros2_controller/policies/go2_walk_v25b.equiv.npz
+!ros2_controller/policies/go2_walk_v33d.equiv.npz

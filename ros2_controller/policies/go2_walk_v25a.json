@@ -1,0 +1,143 @@
+{
+  "name": "go2_walk_v25a",
+  "source_pkl": "/home/tc63/mujoco/mjx-go2-training/policies/go2_walk_v25a.pkl",
+  "source_sha256": "8918ed0d27465f4f28ad42c36e59dfc2451c31a73726dd114a5789f093eede7d",
+  "obs_dim": 243,
+  "privileged_obs_dim": 314,
+  "action_dim": 12,
+  "hidden_sizes": [
+    1024,
+    512
+  ],
+  "activation": "tanh",
+  "output": "loc (deterministic mode, 无 tanh)",
+  "apply_normalizer": false,
+  "normalizer_note": "训练时 normalize_observations=False（train/train_go2.py:346；experiment-log.md:230；brax ppo/train.py 默认也是 False），所以 params[0] 的 RunningStatisticsState 推理时**不使用**，策略吃原始观测。npz 里仍然保存了 mean/std 以备复核，但 NumpyMLPPolicy 默认 apply_normalizer=False。",
+  "normalizer": "不启用（identity）。误用 (x-mean)/std 会造成 max 偏差见 pitfalls.wrong_normalizer",
+  "pitfalls": {
+    "wrong_normalizer": {
+      "what": "若错误地套上 running_statistics.normalize，动作偏差有多大",
+      "measured_drift": 6.786169844764363,
+      "evidence": "训练环境 4 env × 200 步实测：identity 存活 4/4，|vx_body|=0.474；normalize 存活 0/4，|vx_body|=0.171"
+    },
+    "jax_default_matmul_precision": {
+      "what": "jax 默认 matmul 精度低于 f32 数学精度；设为 highest 后与 numpy(f64) 只差 1e-6 量级",
+      "max_abs_err": 4.385010565988168e-06,
+      "p99_abs_err": 1.0744476882873485e-06,
+      "median_abs_err": 1.422465327749478e-07
+    }
+  },
+  "distribution_type": "normal",
+  "brax_jax_flax": {
+    "brax": "0.14.2",
+    "jax": "0.7.2",
+    "flax": "0.11.2"
+  },
+  "obs_layout": [
+    {
+      "name": "base_lin_vel_world",
+      "start": 0,
+      "len": 3,
+      "scale": 2.0,
+      "source": "data.qvel[0:3] * obs_scale.linear_velocity"
+    },
+    {
+      "name": "base_ang_vel_body",
+      "start": 3,
+      "len": 3,
+      "scale": 0.25,
+      "source": "data.qvel[3:6] * obs_scale.angular_velocity"
+    },
+    {
+      "name": "projected_gravity",
+      "start": 6,
+      "len": 3,
+      "scale": 1.0,
+      "source": "site_xmat[imu].T @ [0,0,-1]"
+    },
+    {
+      "name": "command",
+      "start": 9,
+      "len": 3,
+      "scale": 2.0,
+      "source": "info['command'] * obs_scale.linear_velocity"
+    },
+    {
+      "name": "dofs_position",
+      "start": 12,
+      "len": 12,
+      "scale": 1.0,
+      "source": "qpos[7:] - key_ctrl[0]（obs_scale.dofs_position 没被乘上）"
+    },
+    {
+      "name": "dofs_velocity",
+      "start": 24,
+      "len": 12,
+      "scale": 1.0,
+      "source": "qvel[6:]（**不缩放**；obs_scale.dofs_velocity=0.05 在代码里没被使用）"
+    },
+    {
+      "name": "last_action",
+      "start": 36,
+      "len": 12,
+      "scale": 1.0,
+      "source": "info['last_act']"
+    },
+    {
+      "name": "height_scan",
+      "start": 48,
+      "len": 35,
+      "scale": 1.0,
+      "source": "clip(z-h-0.28, ±0.35)*5.0，7x5 yaw 对齐网格，x 外层 y 内层"
+    },
+    {
+      "name": "gait_phase_cos",
+      "start": 83,
+      "len": 4,
+      "scale": 1.0,
+      "source": "cos(trot_i + Phi), trot=[0,pi,pi,0] (FR,FL,RR,RL)"
+    },
+    {
+      "name": "gait_phase_sin",
+      "start": 87,
+      "len": 4,
+      "scale": 1.0,
+      "source": "sin(trot_i + Phi)"
+    }
+  ],
+  "training_home_q": [
+    0.0,
+    0.8,
+    -1.5,
+    0.0,
+    0.8,
+    -1.5,
+    0.0,
+    1.0,
+    -1.5,
+    0.0,
+    1.0,
+    -1.5
+  ],
+  "action_semantics": {
+    "kind": "joint_position_target_rad",
+    "lowcmd_mapping": {
+      "q": "action[i]",
+      "dq": 0.0,
+      "kp": 20.0,
+      "kd": 1.0,
+      "tau": 0.0
+    },
+    "training_actuator": "<position kp=20 kv=1 forcerange=±23.7 (knee ±35.55)>",
+    "note": "训练时 MuJoCo 按 actuator ctrlrange 内部 clamp；部署侧由关节 limit 兜底"
+  },
+  "exported_at": "2026-10-20T10:13:05+0800",
+  "equivalence": {
+    "n_samples": 4096,
+    "numpy_f64_vs_jax_f64_max_abs_err": 1.582067810090848e-14,
+    "numpy_f64_vs_jax_f32_highest_max_abs_err": 4.385010565988168e-06,
+    "exact_atol": 1e-09,
+    "f32_atol": 0.0001,
+    "passed": true
+  }
+}

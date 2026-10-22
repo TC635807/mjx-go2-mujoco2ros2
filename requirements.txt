@@ -1,0 +1,9 @@
+# 仿真 / 观察器 / 测试的最小依赖（Python >= 3.10；仓库在 3.14 上验证）
+mujoco>=3.2,<4
+numpy>=1.26
+
+# 说明:
+#   * 策略推理是纯 numpy，不需要 jax / brax（导出的 .npz 自带权重与元数据）。
+#   * 观察器用 MuJoCo 自带 viewer（需要 OpenGL / WSLg 或 X11）。
+#   * 真机 / DDS 部署还需要系统 ROS 2（rclpy + rmw_cyclonedds_cpp）与
+#     cyclonedds / unitree_sdk2_python，见 docs/ros2-setup.md 与 real_env/README.md。

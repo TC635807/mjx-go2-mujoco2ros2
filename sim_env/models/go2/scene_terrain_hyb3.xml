@@ -1,0 +1,595 @@
+<mujoco model="go2 terrain hyb3">
+  <!-- 由 mjx-go2-training/sim/export_deploy_terrains.py 生成, 不要手改。
+       来源: models/go2/scene_mjx_terrain_hyb3.xml (训练地形)。
+       部署版: 机器人 include 换成 ../go2.xml (力矩电机)。
+       box geoms: 153 (group4: 物理碰撞/raycast 可见, 渲染隐藏);
+       视觉 hfield: terrain_hyb3.png; 视觉网格: terrain_hyb3_vis.obj; 碰撞盒瓦片: 392 个 (group4, alpha0)。
+
+       视觉统一 (2026-10-22, 用户反馈修复):
+       1) 所有地形表面 (hfield / 方块 / 台阶) 共用同一个地面材质 + 网格线纹理,
+          不再出现"棕色方块 vs 地面色 hfield"两种颜色;
+       2) 有 box 的地形额外生成一个 **视觉网格 OBJ** (顶面+侧面) 负责渲染; 碰撞
+          方块与倾斜瓦片放 group=4, 观察器默认隐藏 -> 渲染只剩 1 个地形 geom
+          (big1: 3168 -> ~65 个可见 geom, 帧率大幅提升);
+       3) 统一材质带网格线纹理 + 保留台阶竖面/棱 -> 高度可辨识;
+       4) 物理与 raycast 语义不变: hfield group=1 (视觉, ray 可见), 碰撞盒/瓦片
+          alpha 与 group 只影响渲染, raycast 仍按 group/alpha 规则命中。 -->
+  <include file="go2.xml"/>
+
+  <statistic center="0 0 0.1" extent="0.8"/>
+
+  <visual>
+    <headlight diffuse="0.65 0.65 0.65" ambient="0.32 0.32 0.32" specular="0 0 0"/>
+    <rgba haze="0.16 0.26 0.36 1"/>
+    <global azimuth="-130" elevation="-20" offwidth="1280" offheight="720"/>
+    <quality shadowsize="512" offsamples="1"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+      rgb1="0.42 0.40 0.35" rgb2="0.30 0.29 0.25" markrgb="0.86 0.83 0.72"
+      width="256" height="256"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+      texrepeat="10 10" reflectance="0.05"/>
+    <material name="box_mat" texture="groundplane" texuniform="true" texrepeat="10 10"/>
+    <material name="pebble_mat" texture="groundplane" texuniform="true" texrepeat="10 10"/>
+    <material name="wall_mat" texture="groundplane" texuniform="true" texrepeat="10 10"/>
+    <mesh name="terrain_vis" file="terrain_hyb3_vis.obj" smoothnormal="false"/>
+    <hfield name="terrain" file="terrain_hyb3.png" size="6.000 6.000 0.1160 0.0960"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" type="hfield" hfield="terrain" material="groundplane"
+      pos="0 0 0" friction="1.0 0.02 0.01" contype="0" conaffinity="0" group="1"/>
+    <geom name="floor_plane" type="plane" size="0 0 0.05" material="groundplane"
+      pos="0 0 -0.002" friction="1.0 0.02 0.01" group="4"/>
+    <geom name="terrain_vis" type="mesh" mesh="terrain_vis" material="groundplane" pos="0 0 0" contype="0" conaffinity="0" group="1"/>
+    <geom name="tc_009_023" type="box" pos="-4.0969 -1.2950 -0.0321" size="0.1050 0.1050 0.0600" quat="0.998806 0.041559 -0.025676 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_024" type="box" pos="-4.0963 -1.0988 -0.0265" size="0.1050 0.1050 0.0600" quat="0.999467 0.009774 -0.031144 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_025" type="box" pos="-4.0961 -0.9014 -0.0244" size="0.1050 0.1050 0.0600" quat="0.999400 -0.011872 -0.032524 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_026" type="box" pos="-4.0970 -0.7020 -0.0360" size="0.1050 0.1050 0.0600" quat="0.999543 -0.016567 -0.025283 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_027" type="box" pos="-4.0970 -0.4997 -0.0377" size="0.1050 0.1050 0.0600" quat="0.999679 0.002163 -0.025228 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_028" type="box" pos="-4.0970 -0.3001 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999692 -0.000961 -0.024812 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_029" type="box" pos="-4.0968 -0.1027 -0.0384" size="0.1050 0.1050 0.0600" quat="0.999405 -0.022241 -0.026375 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_030" type="box" pos="-4.0973 0.0977 -0.0521" size="0.1050 0.1050 0.0600" quat="0.999559 -0.019492 -0.022417 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_031" type="box" pos="-4.0975 0.3007 -0.0541" size="0.1050 0.1050 0.0600" quat="0.999759 0.005938 -0.021138 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_032" type="box" pos="-4.0969 0.5012 -0.0474" size="0.1050 0.1050 0.0600" quat="0.999614 0.009670 -0.026041 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_033" type="box" pos="-4.0971 0.6999 -0.0464" size="0.1050 0.1050 0.0600" quat="0.999706 -0.000658 -0.024221 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_034" type="box" pos="-4.0978 0.9001 -0.0480" size="0.1050 0.1050 0.0600" quat="0.999827 0.000867 -0.018584 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_035" type="box" pos="-4.0976 1.1003 -0.0457" size="0.1050 0.1050 0.0600" quat="0.999791 0.002519 -0.020283 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_009_036" type="box" pos="-4.0968 1.2979 -0.0459" size="0.1050 0.1050 0.0600" quat="0.999476 -0.017803 -0.027048 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_023" type="box" pos="-3.9003 -1.2963 -0.0393" size="0.1050 0.1050 0.0600" quat="0.999511 0.031148 0.002891 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_024" type="box" pos="-3.9015 -1.0992 -0.0350" size="0.1050 0.1050 0.0600" quat="0.999900 0.006812 0.012430 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_025" type="box" pos="-3.9020 -0.9007 -0.0339" size="0.1050 0.1050 0.0600" quat="0.999848 -0.005873 0.016440 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_026" type="box" pos="-3.9010 -0.7009 -0.0397" size="0.1050 0.1050 0.0600" quat="0.999939 -0.007329 0.008296 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_027" type="box" pos="-3.9007 -0.5001 -0.0398" size="0.1050 0.1050 0.0600" quat="0.999984 -0.000483 0.005724 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_028" type="box" pos="-3.9007 -0.2999 -0.0401" size="0.1050 0.1050 0.0600" quat="0.999983 0.001170 0.005672 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_029" type="box" pos="-3.8992 -0.1003 -0.0389" size="0.1050 0.1050 0.0600" quat="0.999976 -0.002388 -0.006449 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_030" type="box" pos="-3.8975 0.0994 -0.0420" size="0.1050 0.1050 0.0600" quat="0.999766 -0.005266 -0.020982 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_031" type="box" pos="-3.8972 0.3004 -0.0430" size="0.1050 0.1050 0.0600" quat="0.999724 0.003622 -0.023233 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_032" type="box" pos="-3.8981 0.5004 -0.0391" size="0.1050 0.1050 0.0600" quat="0.999865 0.003088 -0.016119 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_033" type="box" pos="-3.8993 0.6991 -0.0406" size="0.1050 0.1050 0.0600" quat="0.999957 -0.007476 -0.005510 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_034" type="box" pos="-3.8995 0.8995 -0.0451" size="0.1050 0.1050 0.0600" quat="0.999983 -0.003947 -0.004407 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_035" type="box" pos="-3.8993 1.1010 -0.0438" size="0.1050 0.1050 0.0600" quat="0.999948 0.008495 -0.005624 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_010_036" type="box" pos="-3.8988 1.2976 -0.0383" size="0.1050 0.1050 0.0600" quat="0.999745 -0.020280 -0.009976 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_023" type="box" pos="-3.7001 -1.2965 -0.0346" size="0.1050 0.1050 0.0600" quat="0.999572 0.029237 0.000620 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_024" type="box" pos="-3.6999 -1.1005 -0.0366" size="0.1050 0.1050 0.0600" quat="0.999993 -0.003762 -0.000621 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_025" type="box" pos="-3.6996 -0.9009 -0.0377" size="0.1050 0.1050 0.0600" quat="0.999965 -0.007756 -0.003118 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_026" type="box" pos="-3.6998 -0.7007 -0.0428" size="0.1050 0.1050 0.0600" quat="0.999982 -0.005866 -0.001459 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_027" type="box" pos="-3.7001 -0.4994 -0.0424" size="0.1050 0.1050 0.0600" quat="0.999988 0.004791 0.000493 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_028" type="box" pos="-3.6992 -0.2987 -0.0389" size="0.1050 0.1050 0.0600" quat="0.999914 0.011209 -0.006765 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_029" type="box" pos="-3.6984 -0.0995 -0.0334" size="0.1050 0.1050 0.0600" quat="0.999896 0.004387 -0.013714 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_030" type="box" pos="-3.6995 0.0997 -0.0354" size="0.1050 0.1050 0.0600" quat="0.999986 -0.002715 -0.004435 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_031" type="box" pos="-3.6996 0.3001 -0.0356" size="0.1050 0.1050 0.0600" quat="0.999993 0.001071 -0.003454 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_032" type="box" pos="-3.6996 0.4990 -0.0346" size="0.1050 0.1050 0.0600" quat="0.999962 -0.008059 -0.003449 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_033" type="box" pos="-3.6998 0.6985 -0.0420" size="0.1050 0.1050 0.0600" quat="0.999922 -0.012374 -0.001777 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_034" type="box" pos="-3.6995 0.9001 -0.0445" size="0.1050 0.1050 0.0600" quat="0.999990 0.000981 -0.004378 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_035" type="box" pos="-3.6994 1.1010 -0.0412" size="0.1050 0.1050 0.0600" quat="0.999954 0.008097 -0.005193 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_011_036" type="box" pos="-3.7004 1.2972 -0.0379" size="0.1050 0.1050 0.0600" quat="0.999719 -0.023436 0.003532 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_023" type="box" pos="-3.5000 -1.2962 -0.0398" size="0.1050 0.1050 0.0600" quat="0.999495 0.031767 0.000114 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_024" type="box" pos="-3.4994 -1.0987 -0.0345" size="0.1050 0.1050 0.0600" quat="0.999930 0.010551 -0.005335 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_025" type="box" pos="-3.4986 -0.9006 -0.0314" size="0.1050 0.1050 0.0600" quat="0.999919 -0.005036 -0.011711 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_026" type="box" pos="-3.4991 -0.7013 -0.0386" size="0.1050 0.1050 0.0600" quat="0.999913 -0.010938 -0.007390 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_027" type="box" pos="-3.4994 -0.4994 -0.0402" size="0.1050 0.1050 0.0600" quat="0.999975 0.004823 -0.005165 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_028" type="box" pos="-3.4993 -0.2982 -0.0347" size="0.1050 0.1050 0.0600" quat="0.999864 0.015375 -0.006016 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_029" type="box" pos="-3.4993 -0.1006 -0.0279" size="0.1050 0.1050 0.0600" quat="0.999973 -0.004719 -0.005719 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_030" type="box" pos="-3.5005 0.0981 -0.0385" size="0.1050 0.1050 0.0600" quat="0.999871 -0.015527 0.004216 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_031" type="box" pos="-3.5012 0.3003 -0.0403" size="0.1050 0.1050 0.0600" quat="0.999947 0.002639 0.009921 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_032" type="box" pos="-3.5002 0.5002 -0.0364" size="0.1050 0.1050 0.0600" quat="0.999998 0.001412 0.001715 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_033" type="box" pos="-3.4985 0.6992 -0.0392" size="0.1050 0.1050 0.0600" quat="0.999901 -0.006547 -0.012463 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_034" type="box" pos="-3.4997 0.8999 -0.0416" size="0.1050 0.1050 0.0600" quat="0.999996 -0.000531 -0.002800 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_035" type="box" pos="-3.5003 1.1001 -0.0396" size="0.1050 0.1050 0.0600" quat="0.999997 0.000583 0.002436 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_012_036" type="box" pos="-3.5005 1.2969 -0.0411" size="0.1050 0.1050 0.0600" quat="0.999667 -0.025463 0.004260 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_023" type="box" pos="-3.2995 -1.2959 -0.0346" size="0.1050 0.1050 0.0600" quat="0.999395 0.034548 -0.004011 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_024" type="box" pos="-3.3000 -1.0990 -0.0323" size="0.1050 0.1050 0.0600" quat="0.999967 0.008064 0.000161 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_025" type="box" pos="-3.2996 -0.9007 -0.0283" size="0.1050 0.1050 0.0600" quat="0.999978 -0.005700 -0.003246 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_026" type="box" pos="-3.2996 -0.7015 -0.0369" size="0.1050 0.1050 0.0600" quat="0.999917 -0.012412 -0.003581 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_027" type="box" pos="-3.3007 -0.4996 -0.0382" size="0.1050 0.1050 0.0600" quat="0.999978 0.003416 0.005672 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_028" type="box" pos="-3.3011 -0.2986 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999890 0.011762 0.009071 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_029" type="box" pos="-3.3010 -0.1007 -0.0288" size="0.1050 0.1050 0.0600" quat="0.999948 -0.005846 0.008339 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_030" type="box" pos="-3.2995 0.0978 -0.0388" size="0.1050 0.1050 0.0600" quat="0.999824 -0.018348 -0.003831 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_031" type="box" pos="-3.2997 0.3004 -0.0435" size="0.1050 0.1050 0.0600" quat="0.999991 0.003573 -0.002421 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_032" type="box" pos="-3.2997 0.5017 -0.0359" size="0.1050 0.1050 0.0600" quat="0.999895 0.014325 -0.002392 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_033" type="box" pos="-3.2987 0.6991 -0.0320" size="0.1050 0.1050 0.0600" quat="0.999914 -0.007859 -0.010484 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_034" type="box" pos="-3.3009 0.8983 -0.0422" size="0.1050 0.1050 0.0600" quat="0.999873 -0.013917 0.007773 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_035" type="box" pos="-3.3015 1.1001 -0.0432" size="0.1050 0.1050 0.0600" quat="0.999925 0.001033 0.012171 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_013_036" type="box" pos="-3.3006 1.3118 -0.0402" size="0.1050 0.1050 0.0600" quat="0.995051 0.099232 0.005060 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_023" type="box" pos="-3.1015 -1.2962 -0.0365" size="0.1050 0.1050 0.0600" quat="0.999419 0.031598 0.012748 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_024" type="box" pos="-3.1009 -1.0988 -0.0347" size="0.1050 0.1050 0.0600" quat="0.999921 0.009778 0.007850 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_025" type="box" pos="-3.1009 -0.9002 -0.0288" size="0.1050 0.1050 0.0600" quat="0.999973 -0.001294 0.007302 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_026" type="box" pos="-3.1009 -0.7024 -0.0357" size="0.1050 0.1050 0.0600" quat="0.999775 -0.019846 0.007515 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_027" type="box" pos="-3.1022 -0.5009 -0.0447" size="0.1050 0.1050 0.0600" quat="0.999803 -0.007828 0.018218 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_028" type="box" pos="-3.1024 -0.2985 -0.0419" size="0.1050 0.1050 0.0600" quat="0.999719 0.012703 0.020027 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_029" type="box" pos="-3.1024 -0.0990 -0.0345" size="0.1050 0.1050 0.0600" quat="0.999766 0.008182 0.020021 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_030" type="box" pos="-3.0998 0.0994 -0.0354" size="0.1050 0.1050 0.0600" quat="0.999988 -0.004772 -0.001350 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_031" type="box" pos="-3.0985 0.3001 -0.0384" size="0.1050 0.1050 0.0600" quat="0.999919 0.001199 -0.012687 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_032" type="box" pos="-3.0999 0.5011 -0.0345" size="0.1050 0.1050 0.0600" quat="0.999955 0.009476 -0.001009 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_033" type="box" pos="-3.1008 0.6980 -0.0308" size="0.1050 0.1050 0.0600" quat="0.999836 -0.016709 0.007052 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_034" type="box" pos="-3.1013 0.8972 -0.0478" size="0.1050 0.1050 0.0600" quat="0.999672 -0.023168 0.010879 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_035" type="box" pos="-3.1014 1.1004 -0.0493" size="0.1050 0.1050 0.0600" quat="0.999925 0.003222 0.011787 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_014_036" type="box" pos="-3.1008 1.3127 -0.0439" size="0.1050 0.1050 0.0600" quat="0.994282 0.106571 0.006799 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_023" type="box" pos="-2.9004 -1.2968 -0.0449" size="0.1050 0.1050 0.0600" quat="0.999638 0.026730 0.003134 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_024" type="box" pos="-2.9005 -1.0984 -0.0386" size="0.1050 0.1050 0.0600" quat="0.999898 0.013529 0.004486 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_025" type="box" pos="-2.9016 -0.9006 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999892 -0.005367 0.013666 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_026" type="box" pos="-2.9021 -0.7028 -0.0428" size="0.1050 0.1050 0.0600" quat="0.999577 -0.023313 0.017368 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_027" type="box" pos="-2.9010 -0.5011 -0.0528" size="0.1050 0.1050 0.0600" quat="0.999922 -0.009105 0.008504 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_028" type="box" pos="-2.9011 -0.2988 -0.0502" size="0.1050 0.1050 0.0600" quat="0.999910 0.009958 0.009006 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_029" type="box" pos="-2.9021 -0.0981 -0.0448" size="0.1050 0.1050 0.0600" quat="0.999720 0.015534 0.017845 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_030" type="box" pos="-2.9009 0.1017 -0.0377" size="0.1050 0.1050 0.0600" quat="0.999871 0.014362 0.007257 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_031" type="box" pos="-2.8992 0.3004 -0.0334" size="0.1050 0.1050 0.0600" quat="0.999972 0.003231 -0.006747 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_032" type="box" pos="-2.9001 0.4994 -0.0351" size="0.1050 0.1050 0.0600" quat="0.999985 -0.005416 0.001185 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_033" type="box" pos="-2.9013 0.6976 -0.0376" size="0.1050 0.1050 0.0600" quat="0.999747 -0.019745 0.010763 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_034" type="box" pos="-2.8999 0.8978 -0.0509" size="0.1050 0.1050 0.0600" quat="0.999826 -0.018646 -0.001051 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_035" type="box" pos="-2.8998 1.1006 -0.0526" size="0.1050 0.1050 0.0600" quat="0.999986 0.005004 -0.001658 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_015_036" type="box" pos="-2.9005 1.2989 -0.0469" size="0.1050 0.1050 0.0600" quat="0.999947 -0.009229 0.004563 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_023" type="box" pos="-2.6991 -1.2967 -0.0391" size="0.1050 0.1050 0.0600" quat="0.999605 0.027134 -0.007279 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_024" type="box" pos="-2.7000 -1.1001 -0.0383" size="0.1050 0.1050 0.0600" quat="1.000000 -0.000753 -0.000393 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_025" type="box" pos="-2.7013 -0.9017 -0.0397" size="0.1050 0.1050 0.0600" quat="0.999843 -0.014190 0.010624 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_026" type="box" pos="-2.7007 -0.7018 -0.0496" size="0.1050 0.1050 0.0600" quat="0.999874 -0.014689 0.005945 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_027" type="box" pos="-2.6988 -0.4999 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999947 0.000550 -0.010309 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_028" type="box" pos="-2.6988 -0.2996 -0.0492" size="0.1050 0.1050 0.0600" quat="0.999947 0.003359 -0.009755 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_029" type="box" pos="-2.6997 -0.0988 -0.0488" size="0.1050 0.1050 0.0600" quat="0.999947 0.009935 -0.002539 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_030" type="box" pos="-2.7001 0.1024 -0.0412" size="0.1050 0.1050 0.0600" quat="0.999803 0.019824 0.000995 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_031" type="box" pos="-2.6998 0.3009 -0.0330" size="0.1050 0.1050 0.0600" quat="0.999973 0.007273 -0.001289 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_032" type="box" pos="-2.7009 0.4990 -0.0354" size="0.1050 0.1050 0.0600" quat="0.999942 -0.008040 0.007130 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_033" type="box" pos="-2.7013 0.6983 -0.0394" size="0.1050 0.1050 0.0600" quat="0.999841 -0.014474 0.010420 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_034" type="box" pos="-2.6985 0.8987 -0.0470" size="0.1050 0.1050 0.0600" quat="0.999869 -0.010757 -0.012098 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_035" type="box" pos="-2.6979 1.0997 -0.0480" size="0.1050 0.1050 0.0600" quat="0.999838 -0.002392 -0.017827 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_016_036" type="box" pos="-2.7003 1.2982 -0.0489" size="0.1050 0.1050 0.0600" quat="0.999884 -0.014969 0.002823 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_023" type="box" pos="-2.5006 -1.2967 -0.0391" size="0.1050 0.1050 0.0600" quat="0.999618 0.027121 0.005334 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_024" type="box" pos="-2.4995 -1.1005 -0.0383" size="0.1050 0.1050 0.0600" quat="0.999983 -0.004383 -0.003971 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_025" type="box" pos="-2.4998 -0.9014 -0.0426" size="0.1050 0.1050 0.0600" quat="0.999930 -0.011707 -0.001852 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_026" type="box" pos="-2.4988 -0.7003 -0.0476" size="0.1050 0.1050 0.0600" quat="0.999947 -0.002402 -0.009992 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_027" type="box" pos="-2.4987 -0.4992 -0.0446" size="0.1050 0.1050 0.0600" quat="0.999916 0.006594 -0.011147 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_028" type="box" pos="-2.4994 -0.2997 -0.0424" size="0.1050 0.1050 0.0600" quat="0.999985 0.002189 -0.004980 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_029" type="box" pos="-2.4987 -0.0994 -0.0428" size="0.1050 0.1050 0.0600" quat="0.999929 0.004794 -0.010901 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_030" type="box" pos="-2.4986 0.1016 -0.0385" size="0.1050 0.1050 0.0600" quat="0.999845 0.013110 -0.011789 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_031" type="box" pos="-2.5004 0.2997 -0.0323" size="0.1050 0.1050 0.0600" quat="0.999990 -0.002905 0.003421 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_032" type="box" pos="-2.5014 0.4979 -0.0408" size="0.1050 0.1050 0.0600" quat="0.999787 -0.017119 0.011488 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_033" type="box" pos="-2.5013 0.6999 -0.0460" size="0.1050 0.1050 0.0600" quat="0.999942 -0.000526 0.010797 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_034" type="box" pos="-2.4990 0.9012 -0.0413" size="0.1050 0.1050 0.0600" quat="0.999920 0.009603 -0.008272 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_035" type="box" pos="-2.4979 1.0988 -0.0383" size="0.1050 0.1050 0.0600" quat="0.999796 -0.009916 -0.017617 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_017_036" type="box" pos="-2.4991 1.2968 -0.0491" size="0.1050 0.1050 0.0600" quat="0.999604 -0.027034 -0.007861 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_023" type="box" pos="-2.3004 -1.2963 -0.0433" size="0.1050 0.1050 0.0600" quat="0.999511 0.031091 0.003331 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_024" type="box" pos="-2.2994 -1.0992 -0.0351" size="0.1050 0.1050 0.0600" quat="0.999965 0.006439 -0.005297 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_025" type="box" pos="-2.2988 -0.9010 -0.0383" size="0.1050 0.1050 0.0600" quat="0.999917 -0.008172 -0.009925 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_026" type="box" pos="-2.2988 -0.7006 -0.0416" size="0.1050 0.1050 0.0600" quat="0.999937 -0.005396 -0.009883 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_027" type="box" pos="-2.2996 -0.5005 -0.0426" size="0.1050 0.1050 0.0600" quat="0.999985 -0.004464 -0.003160 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_028" type="box" pos="-2.3009 -0.2996 -0.0452" size="0.1050 0.1050 0.0600" quat="0.999967 0.003113 0.007496 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_029" type="box" pos="-2.3001 -0.0980 -0.0401" size="0.1050 0.1050 0.0600" quat="0.999860 0.016744 0.000592 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_030" type="box" pos="-2.2991 0.1007 -0.0318" size="0.1050 0.1050 0.0600" quat="0.999954 0.005510 -0.007898 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_031" type="box" pos="-2.3003 0.2981 -0.0357" size="0.1050 0.1050 0.0600" quat="0.999868 -0.016010 0.002733 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_032" type="box" pos="-2.2996 0.4982 -0.0446" size="0.1050 0.1050 0.0600" quat="0.999875 -0.015414 -0.003439 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_033" type="box" pos="-2.2989 0.7006 -0.0480" size="0.1050 0.1050 0.0600" quat="0.999946 0.005287 -0.008917 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_034" type="box" pos="-2.2991 0.9021 -0.0403" size="0.1050 0.1050 0.0600" quat="0.999815 0.017656 -0.007582 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_035" type="box" pos="-2.2993 1.0997 -0.0339" size="0.1050 0.1050 0.0600" quat="0.999980 -0.002796 -0.005719 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_018_036" type="box" pos="-2.2984 1.2961 -0.0425" size="0.1050 0.1050 0.0600" quat="0.999387 -0.032541 -0.012927 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_023" type="box" pos="-2.0996 -1.2961 -0.0417" size="0.1050 0.1050 0.0600" quat="0.999470 0.032398 -0.003307 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_024" type="box" pos="-2.1006 -1.0989 -0.0340" size="0.1050 0.1050 0.0600" quat="0.999947 0.008879 0.005136 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_025" type="box" pos="-2.0994 -0.9009 -0.0347" size="0.1050 0.1050 0.0600" quat="0.999963 -0.007121 -0.004894 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_026" type="box" pos="-2.0999 -0.7011 -0.0397" size="0.1050 0.1050 0.0600" quat="0.999958 -0.009168 -0.000436 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_027" type="box" pos="-2.1002 -0.5013 -0.0420" size="0.1050 0.1050 0.0600" quat="0.999940 -0.010783 0.001938 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_028" type="box" pos="-2.1006 -0.3002 -0.0484" size="0.1050 0.1050 0.0600" quat="0.999988 -0.001564 0.004677 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_029" type="box" pos="-2.1013 -0.0976 -0.0432" size="0.1050 0.1050 0.0600" quat="0.999734 0.020175 0.011169 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_030" type="box" pos="-2.1010 0.1013 -0.0322" size="0.1050 0.1050 0.0600" quat="0.999906 0.010971 0.008229 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_031" type="box" pos="-2.0998 0.2991 -0.0345" size="0.1050 0.1050 0.0600" quat="0.999972 -0.007363 -0.001303 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_032" type="box" pos="-2.0984 0.4993 -0.0381" size="0.1050 0.1050 0.0600" quat="0.999892 -0.005476 -0.013624 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_033" type="box" pos="-2.0977 0.7004 -0.0389" size="0.1050 0.1050 0.0600" quat="0.999812 0.003618 -0.019048 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_034" type="box" pos="-2.0996 0.9008 -0.0352" size="0.1050 0.1050 0.0600" quat="0.999973 0.006406 -0.003502 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_035" type="box" pos="-2.1010 1.0995 -0.0338" size="0.1050 0.1050 0.0600" quat="0.999958 -0.004558 0.007965 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_019_036" type="box" pos="-2.0995 1.3014 -0.0388" size="0.1050 0.1050 0.0600" quat="0.999918 0.011961 -0.004576 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_023" type="box" pos="-1.9002 -1.2969 -0.0407" size="0.1050 0.1050 0.0600" quat="0.999661 0.025974 0.001529 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_024" type="box" pos="-1.9007 -1.0990 -0.0392" size="0.1050 0.1050 0.0600" quat="0.999949 0.008021 0.006159 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_025" type="box" pos="-1.8996 -0.9003 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999991 -0.002601 -0.003279 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_026" type="box" pos="-1.9003 -0.7015 -0.0413" size="0.1050 0.1050 0.0600" quat="0.999922 -0.012227 0.002430 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_027" type="box" pos="-1.9010 -0.5011 -0.0441" size="0.1050 0.1050 0.0600" quat="0.999917 -0.009574 0.008584 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_028" type="box" pos="-1.9003 -0.3007 -0.0489" size="0.1050 0.1050 0.0600" quat="0.999977 -0.006127 0.002890 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_029" type="box" pos="-1.9007 -0.0984 -0.0490" size="0.1050 0.1050 0.0600" quat="0.999898 0.013193 0.005467 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_030" type="box" pos="-1.9010 0.1022 -0.0383" size="0.1050 0.1050 0.0600" quat="0.999806 0.017982 0.008093 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_031" type="box" pos="-1.9002 0.3007 -0.0347" size="0.1050 0.1050 0.0600" quat="0.999981 0.005842 0.001820 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_032" type="box" pos="-1.8996 0.5003 -0.0337" size="0.1050 0.1050 0.0600" quat="0.999993 0.002336 -0.003037 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_033" type="box" pos="-1.8994 0.6994 -0.0328" size="0.1050 0.1050 0.0600" quat="0.999975 -0.004838 -0.005165 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_034" type="box" pos="-1.9008 0.8989 -0.0376" size="0.1050 0.1050 0.0600" quat="0.999933 -0.009357 0.006860 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_035" type="box" pos="-1.9012 1.0998 -0.0403" size="0.1050 0.1050 0.0600" quat="0.999949 -0.001720 0.009987 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_020_036" type="box" pos="-1.8998 1.3024 -0.0389" size="0.1050 0.1050 0.0600" quat="0.999796 0.020102 -0.001724 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_023" type="box" pos="-1.7009 -1.2988 -0.0430" size="0.1050 0.1050 0.0600" quat="0.999924 0.010037 0.007144 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_024" type="box" pos="-1.7002 -1.0984 -0.0389" size="0.1050 0.1050 0.0600" quat="0.999905 0.013686 0.001615 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_025" type="box" pos="-1.7006 -0.9004 -0.0321" size="0.1050 0.1050 0.0600" quat="0.999983 -0.003393 0.004843 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_026" type="box" pos="-1.7003 -0.7025 -0.0416" size="0.1050 0.1050 0.0600" quat="0.999776 -0.021020 0.002628 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_027" type="box" pos="-1.6998 -0.5013 -0.0489" size="0.1050 0.1050 0.0600" quat="0.999935 -0.011242 -0.001909 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_028" type="box" pos="-1.6994 -0.2998 -0.0507" size="0.1050 0.1050 0.0600" quat="0.999986 0.001554 -0.005113 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_029" type="box" pos="-1.6989 -0.0982 -0.0476" size="0.1050 0.1050 0.0600" quat="0.999849 0.014977 -0.008800 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_030" type="box" pos="-1.7005 0.1018 -0.0387" size="0.1050 0.1050 0.0600" quat="0.999885 0.014618 0.003941 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_031" type="box" pos="-1.7014 0.3005 -0.0360" size="0.1050 0.1050 0.0600" quat="0.999922 0.003771 0.011896 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_032" type="box" pos="-1.7012 0.5002 -0.0357" size="0.1050 0.1050 0.0600" quat="0.999953 0.001507 0.009594 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_033" type="box" pos="-1.7008 0.6992 -0.0348" size="0.1050 0.1050 0.0600" quat="0.999959 -0.006278 0.006505 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_034" type="box" pos="-1.7010 0.8990 -0.0407" size="0.1050 0.1050 0.0600" quat="0.999924 -0.008745 0.008703 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_035" type="box" pos="-1.7001 1.1005 -0.0418" size="0.1050 0.1050 0.0600" quat="0.999991 0.004028 0.000990 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_021_036" type="box" pos="-1.7001 1.2973 -0.0374" size="0.1050 0.1050 0.0600" quat="0.999740 -0.022779 0.001080 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_023" type="box" pos="-1.5025 -1.2990 -0.0465" size="0.1050 0.1050 0.0600" quat="0.999742 0.008128 0.021189 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_024" type="box" pos="-1.5031 -1.0988 -0.0404" size="0.1050 0.1050 0.0600" quat="0.999602 0.010313 0.026258 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_025" type="box" pos="-1.5042 -0.9004 -0.0381" size="0.1050 0.1050 0.0600" quat="0.999387 -0.003609 0.034831 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_026" type="box" pos="-1.5027 -0.7007 -0.0433" size="0.1050 0.1050 0.0600" quat="0.999723 -0.005473 0.022878 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_027" type="box" pos="-1.5017 -0.5002 -0.0426" size="0.1050 0.1050 0.0600" quat="0.999902 -0.001833 0.013856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_028" type="box" pos="-1.5014 -0.2999 -0.0448" size="0.1050 0.1050 0.0600" quat="0.999932 0.000767 0.011650 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_029" type="box" pos="-1.5018 -0.0995 -0.0420" size="0.1050 0.1050 0.0600" quat="0.999873 0.004140 0.015409 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_030" type="box" pos="-1.5032 0.0997 -0.0415" size="0.1050 0.1050 0.0600" quat="0.999642 -0.002708 0.026607 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_031" type="box" pos="-1.5036 0.3000 -0.0441" size="0.1050 0.1050 0.0600" quat="0.999550 0.000189 0.029997 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_032" type="box" pos="-1.5036 0.5009 -0.0413" size="0.1050 0.1050 0.0600" quat="0.999509 0.007717 0.030363 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_033" type="box" pos="-1.5038 0.6995 -0.0379" size="0.1050 0.1050 0.0600" quat="0.999496 -0.003941 0.031497 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_034" type="box" pos="-1.5029 0.8995 -0.0445" size="0.1050 0.1050 0.0600" quat="0.999702 -0.003840 0.024107 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_035" type="box" pos="-1.5027 1.1007 -0.0410" size="0.1050 0.1050 0.0600" quat="0.999723 0.005899 0.022778 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_022_036" type="box" pos="-1.5034 1.2972 -0.0397" size="0.1050 0.1050 0.0600" quat="0.999327 -0.023598 0.028100 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_023" type="box" pos="1.5012 -1.3082 -0.0529" size="0.1050 0.1050 0.0600" quat="0.997594 -0.068553 -0.010359 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_024" type="box" pos="1.5035 -1.0997 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999560 0.002305 -0.029558 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_025" type="box" pos="1.5038 -0.9000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_026" type="box" pos="1.5038 -0.7000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_027" type="box" pos="1.5038 -0.5000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_028" type="box" pos="1.5038 -0.3000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_029" type="box" pos="1.5038 -0.1000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_030" type="box" pos="1.5038 0.1000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_031" type="box" pos="1.5038 0.3000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_032" type="box" pos="1.5038 0.5000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_033" type="box" pos="1.5038 0.7000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_034" type="box" pos="1.5038 0.9000 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999497 0.000000 -0.031710 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_035" type="box" pos="1.5034 1.0995 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999583 -0.003919 -0.028595 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_037_036" type="box" pos="1.5013 1.2987 -0.0548" size="0.1050 0.1050 0.0600" quat="0.999891 -0.010445 -0.010431 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_023" type="box" pos="1.7003 -1.3060 -0.0514" size="0.1050 0.1050 0.0600" quat="0.998761 -0.049717 -0.002285 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_024" type="box" pos="1.7026 -1.0974 -0.0362" size="0.1050 0.1050 0.0600" quat="0.999539 0.021294 -0.021621 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_025" type="box" pos="1.7048 -0.8997 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999183 0.002155 -0.040354 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_026" type="box" pos="1.7051 -0.7000 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999081 -0.000000 -0.042856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_027" type="box" pos="1.7051 -0.5000 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999081 0.000000 -0.042856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_028" type="box" pos="1.7051 -0.3000 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999081 0.000000 -0.042856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_029" type="box" pos="1.7051 -0.1000 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999081 0.000000 -0.042856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_030" type="box" pos="1.7051 0.1000 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999081 0.000000 -0.042856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_031" type="box" pos="1.7051 0.3000 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999081 0.000000 -0.042856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_032" type="box" pos="1.7051 0.5000 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999081 0.000000 -0.042856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_033" type="box" pos="1.7051 0.7000 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999081 -0.000000 -0.042856 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_034" type="box" pos="1.7048 0.8996 -0.0344" size="0.1050 0.1050 0.0600" quat="0.999187 -0.003120 -0.040198 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_035" type="box" pos="1.7026 1.0974 -0.0370" size="0.1050 0.1050 0.0600" quat="0.999539 -0.021294 -0.021621 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_038_036" type="box" pos="1.7005 1.2966 -0.0516" size="0.1050 0.1050 0.0600" quat="0.999583 -0.028595 -0.003904 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_023" type="box" pos="1.9000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_024" type="box" pos="1.9003 -1.0952 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999182 0.040368 -0.002496 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_025" type="box" pos="1.9026 -0.8974 -0.0192" size="0.1050 0.1050 0.0600" quat="0.999544 0.021294 -0.021408 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_026" type="box" pos="1.9049 -0.6997 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999170 0.002515 -0.040655 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_027" type="box" pos="1.9051 -0.5000 -0.0170" size="0.1050 0.1050 0.0600" quat="0.999084 -0.000000 -0.042799 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_028" type="box" pos="1.9051 -0.3000 -0.0170" size="0.1050 0.1050 0.0600" quat="0.999084 0.000000 -0.042799 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_029" type="box" pos="1.9051 -0.1000 -0.0170" size="0.1050 0.1050 0.0600" quat="0.999084 0.000000 -0.042799 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_030" type="box" pos="1.9051 0.1000 -0.0170" size="0.1050 0.1050 0.0600" quat="0.999084 0.000000 -0.042799 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_031" type="box" pos="1.9051 0.3000 -0.0170" size="0.1050 0.1050 0.0600" quat="0.999084 0.000000 -0.042799 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_032" type="box" pos="1.9051 0.5000 -0.0170" size="0.1050 0.1050 0.0600" quat="0.999084 0.000000 -0.042799 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_033" type="box" pos="1.9048 0.6997 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999182 -0.002671 -0.040344 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_034" type="box" pos="1.9026 0.8974 -0.0193" size="0.1050 0.1050 0.0600" quat="0.999544 -0.021294 -0.021408 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_035" type="box" pos="1.9004 1.0952 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999185 -0.040212 -0.003460 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_039_036" type="box" pos="1.9000 1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 -0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_023" type="box" pos="2.1000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_024" type="box" pos="2.1000 -1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_025" type="box" pos="2.1003 -0.8952 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999184 0.040316 -0.002288 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_026" type="box" pos="2.1026 -0.6974 -0.0019" size="0.1050 0.1050 0.0600" quat="0.999541 0.021450 -0.021408 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_027" type="box" pos="2.1048 -0.4997 -0.0001" size="0.1050 0.1050 0.0600" quat="0.999192 0.002156 -0.040142 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_028" type="box" pos="2.1051 -0.3000 -0.0000" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 -0.042644 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_029" type="box" pos="2.1051 -0.1000 -0.0000" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 -0.042644 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_030" type="box" pos="2.1051 0.1000 -0.0000" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 -0.042644 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_031" type="box" pos="2.1051 0.3000 -0.0000" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 -0.042644 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_032" type="box" pos="2.1047 0.4997 -0.0001" size="0.1050 0.1050 0.0600" quat="0.999216 -0.002468 -0.039516 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_033" type="box" pos="2.1026 0.6974 -0.0021" size="0.1050 0.1050 0.0600" quat="0.999541 -0.021450 -0.021408 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_034" type="box" pos="2.1003 0.8952 -0.0173" size="0.1050 0.1050 0.0600" quat="0.999196 -0.040006 -0.002444 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_035" type="box" pos="2.1000 1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_040_036" type="box" pos="2.1000 1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 -0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_023" type="box" pos="2.3000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_024" type="box" pos="2.3000 -1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_025" type="box" pos="2.3000 -0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_026" type="box" pos="2.3003 -0.6952 0.0001" size="0.1050 0.1050 0.0600" quat="0.999182 0.040368 -0.002340 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_027" type="box" pos="2.3025 -0.4974 0.0150" size="0.1050 0.1050 0.0600" quat="0.999547 0.021295 -0.021252 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_028" type="box" pos="2.3049 -0.2997 0.0171" size="0.1050 0.1050 0.0600" quat="0.999174 0.002515 -0.040551 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_029" type="box" pos="2.3052 -0.1000 0.0172" size="0.1050 0.1050 0.0600" quat="0.999073 0.000000 -0.043053 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_030" type="box" pos="2.3052 0.1000 0.0172" size="0.1050 0.1050 0.0600" quat="0.999073 -0.000000 -0.043053 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_031" type="box" pos="2.3048 0.2996 0.0171" size="0.1050 0.1050 0.0600" quat="0.999179 -0.003143 -0.040387 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_032" type="box" pos="2.3025 0.4974 0.0145" size="0.1050 0.1050 0.0600" quat="0.999547 -0.021295 -0.021252 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_033" type="box" pos="2.3003 0.6952 0.0001" size="0.1050 0.1050 0.0600" quat="0.999206 -0.039742 -0.002652 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_034" type="box" pos="2.3000 0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_035" type="box" pos="2.3000 1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_041_036" type="box" pos="2.3000 1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 -0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_023" type="box" pos="2.5000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_024" type="box" pos="2.5000 -1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_025" type="box" pos="2.5000 -0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_026" type="box" pos="2.5000 -0.6949 0.0001" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_027" type="box" pos="2.5003 -0.4952 0.0170" size="0.1050 0.1050 0.0600" quat="0.999182 0.040368 -0.002288 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_028" type="box" pos="2.5026 -0.2974 0.0324" size="0.1050 0.1050 0.0600" quat="0.999532 0.021861 -0.021407 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_029" type="box" pos="2.5049 -0.0997 0.0345" size="0.1050 0.1050 0.0600" quat="0.999178 0.002515 -0.040457 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_030" type="box" pos="2.5048 0.0997 0.0345" size="0.1050 0.1050 0.0600" quat="0.999196 -0.002680 -0.039992 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_031" type="box" pos="2.5026 0.2974 0.0322" size="0.1050 0.1050 0.0600" quat="0.999532 -0.021861 -0.021407 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_032" type="box" pos="2.5003 0.4952 0.0170" size="0.1050 0.1050 0.0600" quat="0.999187 -0.040203 -0.002917 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_033" type="box" pos="2.5000 0.6949 0.0001" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_034" type="box" pos="2.5000 0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_035" type="box" pos="2.5000 1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_042_036" type="box" pos="2.5000 1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 -0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_023" type="box" pos="2.7000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_024" type="box" pos="2.7000 -1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_025" type="box" pos="2.7000 -0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_026" type="box" pos="2.7000 -0.6949 0.0001" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_027" type="box" pos="2.7000 -0.4949 0.0170" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_028" type="box" pos="2.7003 -0.2951 0.0343" size="0.1050 0.1050 0.0600" quat="0.999169 0.040683 -0.002288 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_029" type="box" pos="2.7021 -0.0978 0.0495" size="0.1050 0.1050 0.0600" quat="0.999670 0.018632 -0.017700 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_030" type="box" pos="2.7023 0.0977 0.0491" size="0.1050 0.1050 0.0600" quat="0.999639 -0.019099 -0.018896 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_031" type="box" pos="2.7003 0.2952 0.0343" size="0.1050 0.1050 0.0600" quat="0.999188 -0.040217 -0.002453 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_032" type="box" pos="2.7000 0.4949 0.0170" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_033" type="box" pos="2.7000 0.6949 0.0001" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_034" type="box" pos="2.7000 0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_035" type="box" pos="2.7000 1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_043_036" type="box" pos="2.7000 1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 -0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_023" type="box" pos="2.9000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_024" type="box" pos="2.9000 -1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_025" type="box" pos="2.9000 -0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_026" type="box" pos="2.9000 -0.6949 0.0001" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_027" type="box" pos="2.9000 -0.4949 0.0170" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_028" type="box" pos="2.8995 -0.2953 0.0343" size="0.1050 0.1050 0.0600" quat="0.999210 0.039516 0.004264 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_029" type="box" pos="2.8977 -0.0977 0.0485" size="0.1050 0.1050 0.0600" quat="0.999634 0.019123 0.019151 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_030" type="box" pos="2.8978 0.0978 0.0495" size="0.1050 0.1050 0.0600" quat="0.999665 -0.017927 0.018684 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_031" type="box" pos="2.8997 0.2951 0.0343" size="0.1050 0.1050 0.0600" quat="0.999168 -0.040707 0.002340 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_032" type="box" pos="2.9000 0.4949 0.0170" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_033" type="box" pos="2.9000 0.6949 0.0001" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_034" type="box" pos="2.9000 0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_035" type="box" pos="2.9000 1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_044_036" type="box" pos="2.9000 1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 -0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_023" type="box" pos="3.1000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_024" type="box" pos="3.1000 -1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_025" type="box" pos="3.1000 -0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_026" type="box" pos="3.1000 -0.6949 0.0001" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_027" type="box" pos="3.0996 -0.4954 0.0169" size="0.1050 0.1050 0.0600" quat="0.999256 0.038401 0.003574 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_028" type="box" pos="3.0974 -0.2974 0.0308" size="0.1050 0.1050 0.0600" quat="0.999540 0.021583 0.021294 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_029" type="box" pos="3.0953 -0.0995 0.0342" size="0.1050 0.1050 0.0600" quat="0.999223 0.004212 0.039177 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_030" type="box" pos="3.0952 0.0997 0.0343" size="0.1050 0.1050 0.0600" quat="0.999182 -0.002288 0.040368 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_031" type="box" pos="3.0974 0.2974 0.0323" size="0.1050 0.1050 0.0600" quat="0.999540 -0.021583 0.021294 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_032" type="box" pos="3.0997 0.4952 0.0170" size="0.1050 0.1050 0.0600" quat="0.999185 -0.040316 0.002155 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_033" type="box" pos="3.1000 0.6949 0.0001" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_034" type="box" pos="3.1000 0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_035" type="box" pos="3.1000 1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_045_036" type="box" pos="3.1000 1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 -0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_023" type="box" pos="3.3000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_024" type="box" pos="3.3000 -1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_025" type="box" pos="3.3000 -0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_026" type="box" pos="3.2996 -0.6953 0.0001" size="0.1050 0.1050 0.0600" quat="0.999231 0.039088 0.003087 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_027" type="box" pos="3.2974 -0.4974 0.0140" size="0.1050 0.1050 0.0600" quat="0.999544 0.021408 0.021294 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_028" type="box" pos="3.2954 -0.2995 0.0172" size="0.1050 0.1050 0.0600" quat="0.999246 0.003915 0.038626 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_029" type="box" pos="3.2949 -0.1000 0.0173" size="0.1050 0.1050 0.0600" quat="0.999083 0.000000 0.042818 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_030" type="box" pos="3.2949 0.1000 0.0173" size="0.1050 0.1050 0.0600" quat="0.999083 -0.000000 0.042818 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_031" type="box" pos="3.2951 0.2997 0.0172" size="0.1050 0.1050 0.0600" quat="0.999175 -0.002496 0.040542 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_032" type="box" pos="3.2974 0.4974 0.0151" size="0.1050 0.1050 0.0600" quat="0.999544 -0.021408 0.021294 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_033" type="box" pos="3.2997 0.6951 0.0001" size="0.1050 0.1050 0.0600" quat="0.999176 -0.040500 0.002515 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_034" type="box" pos="3.3000 0.8949 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_035" type="box" pos="3.3000 1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_046_036" type="box" pos="3.3000 1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 -0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_023" type="box" pos="3.5000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_024" type="box" pos="3.5000 -1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_025" type="box" pos="3.4997 -0.8953 -0.0173" size="0.1050 0.1050 0.0600" quat="0.999214 0.039573 0.002241 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_026" type="box" pos="3.4974 -0.6974 -0.0025" size="0.1050 0.1050 0.0600" quat="0.999540 0.021408 0.021488 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_027" type="box" pos="3.4953 -0.4997 -0.0001" size="0.1050 0.1050 0.0600" quat="0.999237 0.002860 0.038942 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_028" type="box" pos="3.4949 -0.3000 -0.0001" size="0.1050 0.1050 0.0600" quat="0.999082 0.000000 0.042837 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_029" type="box" pos="3.4949 -0.1000 -0.0001" size="0.1050 0.1050 0.0600" quat="0.999082 0.000000 0.042837 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_030" type="box" pos="3.4949 0.1000 -0.0001" size="0.1050 0.1050 0.0600" quat="0.999082 0.000000 0.042837 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_031" type="box" pos="3.4949 0.3000 -0.0001" size="0.1050 0.1050 0.0600" quat="0.999082 0.000000 0.042837 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_032" type="box" pos="3.4952 0.4997 -0.0001" size="0.1050 0.1050 0.0600" quat="0.999183 -0.002288 0.040354 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_033" type="box" pos="3.4974 0.6974 -0.0020" size="0.1050 0.1050 0.0600" quat="0.999540 -0.021408 0.021488 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_034" type="box" pos="3.4997 0.8952 -0.0172" size="0.1050 0.1050 0.0600" quat="0.999192 -0.040142 0.002156 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_035" type="box" pos="3.5000 1.0949 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999090 -0.042644 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_047_036" type="box" pos="3.5000 1.3124 -0.0504" size="0.1050 0.1050 0.0600" quat="0.994584 0.103931 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_023" type="box" pos="3.7000 -1.2962 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999486 0.032050 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_024" type="box" pos="3.6996 -1.0952 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999178 0.040415 0.003077 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_025" type="box" pos="3.6974 -0.8975 -0.0191" size="0.1050 0.1050 0.0600" quat="0.999548 0.021214 0.021295 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_026" type="box" pos="3.6952 -0.6997 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999205 0.002387 0.039799 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_027" type="box" pos="3.6949 -0.5000 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 0.042644 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_028" type="box" pos="3.6949 -0.3000 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 0.042644 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_029" type="box" pos="3.6949 -0.1000 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 0.042644 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_030" type="box" pos="3.6949 0.1000 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 0.042644 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_031" type="box" pos="3.6949 0.3000 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 0.042644 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_032" type="box" pos="3.6949 0.5000 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999090 0.000000 0.042644 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_033" type="box" pos="3.6952 0.6997 -0.0171" size="0.1050 0.1050 0.0600" quat="0.999182 -0.002302 0.040368 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_034" type="box" pos="3.6974 0.8975 -0.0191" size="0.1050 0.1050 0.0600" quat="0.999548 -0.021214 0.021295 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_035" type="box" pos="3.6997 1.0951 -0.0341" size="0.1050 0.1050 0.0600" quat="0.999176 -0.040500 0.002515 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_048_036" type="box" pos="3.7000 1.3124 -0.0504" size="0.1050 0.1050 0.0600" quat="0.994584 0.103931 -0.000000 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_023" type="box" pos="3.8996 -1.2965 -0.0516" size="0.1050 0.1050 0.0600" quat="0.999576 0.028977 0.002948 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_024" type="box" pos="3.8974 -1.0974 -0.0367" size="0.1050 0.1050 0.0600" quat="0.999532 0.021407 0.021861 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_025" type="box" pos="3.8951 -0.8997 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999170 0.002850 0.040641 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_026" type="box" pos="3.8948 -0.7000 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999074 0.000000 0.043015 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_027" type="box" pos="3.8948 -0.5000 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999074 0.000000 0.043015 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_028" type="box" pos="3.8948 -0.3000 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999074 0.000000 0.043015 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_029" type="box" pos="3.8948 -0.1000 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999074 0.000000 0.043015 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_030" type="box" pos="3.8948 0.1000 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999074 0.000000 0.043015 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_031" type="box" pos="3.8948 0.3000 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999074 0.000000 0.043015 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_032" type="box" pos="3.8948 0.5000 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999074 0.000000 0.043015 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_033" type="box" pos="3.8948 0.7000 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999074 0.000000 0.043015 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_034" type="box" pos="3.8951 0.8997 -0.0343" size="0.1050 0.1050 0.0600" quat="0.999168 -0.002288 0.040725 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_035" type="box" pos="3.8974 1.0974 -0.0362" size="0.1050 0.1050 0.0600" quat="0.999532 -0.021407 0.021861 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_049_036" type="box" pos="3.8997 1.2965 -0.0515" size="0.1050 0.1050 0.0600" quat="0.999560 -0.029539 0.002518 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_023" type="box" pos="4.0987 -1.2988 -0.0540" size="0.1050 0.1050 0.0600" quat="0.999894 0.010204 0.010431 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_024" type="box" pos="4.0965 -1.0997 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999576 0.002721 0.028977 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_025" type="box" pos="4.0962 -0.9000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_026" type="box" pos="4.0962 -0.7000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_027" type="box" pos="4.0962 -0.5000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_028" type="box" pos="4.0962 -0.3000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_029" type="box" pos="4.0962 -0.1000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_030" type="box" pos="4.0962 0.1000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_031" type="box" pos="4.0962 0.3000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_032" type="box" pos="4.0962 0.5000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_033" type="box" pos="4.0962 0.7000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_034" type="box" pos="4.0962 0.9000 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999494 0.000000 0.031823 -0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_035" type="box" pos="4.0965 1.0997 -0.0517" size="0.1050 0.1050 0.0600" quat="0.999561 -0.002290 0.029539 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom name="tc_050_036" type="box" pos="4.0987 1.2988 -0.0536" size="0.1050 0.1050 0.0600" quat="0.999894 -0.010204 0.010431 0.000000" rgba="1 1 1 0" contype="1" conaffinity="1" group="4" friction="1.0 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_000" type="box" pos="-4.0000 -4.0000 0.0170" size="0.2000 0.2000 0.0170" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_001" type="box" pos="-4.0000 -3.2000 0.0529" size="0.2000 0.2000 0.0529" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_002" type="box" pos="-4.0000 -2.0000 0.0474" size="0.2000 0.2000 0.0474" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_003" type="box" pos="-4.0000 2.4000 0.0142" size="0.2000 0.2000 0.0142" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_004" type="box" pos="-4.0000 2.8000 0.0244" size="0.2000 0.2000 0.0244" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_005" type="box" pos="-4.0000 3.2000 0.0446" size="0.2000 0.2000 0.0446" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_006" type="box" pos="-4.0000 3.6000 0.0122" size="0.2000 0.2000 0.0122" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_007" type="box" pos="-4.0000 4.0000 0.0234" size="0.2000 0.2000 0.0234" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_008" type="box" pos="-3.6000 -3.2000 0.0427" size="0.2000 0.2000 0.0427" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_009" type="box" pos="-3.6000 -2.8000 0.0365" size="0.2000 0.2000 0.0365" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_010" type="box" pos="-3.6000 -2.4000 0.0098" size="0.2000 0.2000 0.0098" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_011" type="box" pos="-3.6000 -2.0000 0.0281" size="0.2000 0.2000 0.0281" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_012" type="box" pos="-3.6000 2.0000 0.0095" size="0.2000 0.2000 0.0095" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_013" type="box" pos="-3.6000 2.4000 0.0237" size="0.2000 0.2000 0.0237" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_014" type="box" pos="-3.6000 2.8000 0.0091" size="0.2000 0.2000 0.0091" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_015" type="box" pos="-3.6000 3.2000 0.0400" size="0.2000 0.2000 0.0400" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_016" type="box" pos="-3.6000 4.0000 0.0142" size="0.2000 0.2000 0.0142" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_017" type="box" pos="-3.2000 -4.0000 0.0275" size="0.2000 0.2000 0.0275" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_018" type="box" pos="-3.2000 -3.6000 0.0412" size="0.2000 0.2000 0.0412" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_019" type="box" pos="-3.2000 -2.8000 0.0444" size="0.2000 0.2000 0.0444" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_020" type="box" pos="-3.2000 -2.4000 0.0255" size="0.2000 0.2000 0.0255" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_021" type="box" pos="-3.2000 -2.0000 0.0122" size="0.2000 0.2000 0.0122" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_022" type="box" pos="-3.2000 1.6000 0.0487" size="0.2000 0.2000 0.0487" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_023" type="box" pos="-3.2000 2.0000 0.0173" size="0.2000 0.2000 0.0173" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_024" type="box" pos="-3.2000 2.4000 0.0336" size="0.2000 0.2000 0.0336" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_025" type="box" pos="-3.2000 3.2000 0.0133" size="0.2000 0.2000 0.0133" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_026" type="box" pos="-3.2000 4.0000 0.0446" size="0.2000 0.2000 0.0446" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_027" type="box" pos="-2.8000 2.0000 0.0085" size="0.2000 0.2000 0.0085" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_028" type="box" pos="-2.8000 2.8000 0.0216" size="0.2000 0.2000 0.0216" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_029" type="box" pos="-2.8000 3.2000 0.0299" size="0.2000 0.2000 0.0299" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_030" type="box" pos="-2.8000 3.6000 0.0494" size="0.2000 0.2000 0.0494" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_031" type="box" pos="-2.4000 -4.0000 0.0070" size="0.2000 0.2000 0.0070" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_032" type="box" pos="-2.4000 -2.8000 0.0575" size="0.2000 0.2000 0.0575" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_033" type="box" pos="-2.4000 -2.4000 0.0442" size="0.2000 0.2000 0.0442" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_034" type="box" pos="-2.4000 2.0000 0.0123" size="0.2000 0.2000 0.0123" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_035" type="box" pos="-2.4000 2.8000 0.0218" size="0.2000 0.2000 0.0218" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_036" type="box" pos="-2.4000 4.0000 0.0084" size="0.2000 0.2000 0.0084" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_037" type="box" pos="-2.0000 -4.0000 0.0264" size="0.2000 0.2000 0.0264" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_038" type="box" pos="-2.0000 -3.6000 0.0336" size="0.2000 0.2000 0.0336" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_039" type="box" pos="-2.0000 -3.2000 0.0386" size="0.2000 0.2000 0.0386" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_040" type="box" pos="-2.0000 -2.4000 0.0285" size="0.2000 0.2000 0.0285" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_041" type="box" pos="-2.0000 -2.0000 0.0580" size="0.2000 0.2000 0.0580" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_042" type="box" pos="-2.0000 1.6000 0.0179" size="0.2000 0.2000 0.0179" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_043" type="box" pos="-2.0000 2.4000 0.0075" size="0.2000 0.2000 0.0075" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_044" type="box" pos="-2.0000 3.2000 0.0311" size="0.2000 0.2000 0.0311" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_045" type="box" pos="-2.0000 3.6000 0.0246" size="0.2000 0.2000 0.0246" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_046" type="box" pos="-2.0000 4.0000 0.0122" size="0.2000 0.2000 0.0122" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_047" type="box" pos="-1.6000 -4.0000 0.0539" size="0.2000 0.2000 0.0539" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_048" type="box" pos="-1.6000 -3.6000 0.0324" size="0.2000 0.2000 0.0324" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_049" type="box" pos="-1.6000 -3.2000 0.0450" size="0.2000 0.2000 0.0450" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_050" type="box" pos="-1.6000 -2.8000 0.0220" size="0.2000 0.2000 0.0220" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_051" type="box" pos="-1.6000 -2.4000 0.0340" size="0.2000 0.2000 0.0340" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_052" type="box" pos="-1.6000 -1.6000 0.0065" size="0.2000 0.2000 0.0065" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_053" type="box" pos="-1.6000 2.0000 0.0212" size="0.2000 0.2000 0.0212" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_054" type="box" pos="-1.6000 2.4000 0.0330" size="0.2000 0.2000 0.0330" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_055" type="box" pos="-1.6000 2.8000 0.0466" size="0.2000 0.2000 0.0466" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_056" type="box" pos="-1.6000 3.2000 0.0177" size="0.2000 0.2000 0.0177" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_057" type="box" pos="-1.6000 4.0000 0.0109" size="0.2000 0.2000 0.0109" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_058" type="box" pos="-1.2000 2.0000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_059" type="box" pos="-1.2000 2.4000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_060" type="box" pos="-1.2000 2.8000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_061" type="box" pos="-1.2000 3.2000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_062" type="box" pos="-0.8000 -4.0000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_063" type="box" pos="-0.8000 -3.6000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_064" type="box" pos="-0.8000 -3.2000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_065" type="box" pos="-0.8000 -2.8000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_066" type="box" pos="-0.8000 -2.4000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_067" type="box" pos="-0.8000 -2.0000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_068" type="box" pos="-0.8000 -1.6000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_069" type="box" pos="-0.8000 2.0000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_070" type="box" pos="-0.8000 2.4000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_071" type="box" pos="-0.8000 2.8000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_072" type="box" pos="-0.8000 3.2000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_073" type="box" pos="-0.4000 -4.0000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_074" type="box" pos="-0.4000 -3.6000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_075" type="box" pos="-0.4000 -3.2000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_076" type="box" pos="-0.4000 -2.8000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_077" type="box" pos="-0.4000 -2.4000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_078" type="box" pos="-0.4000 -2.0000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_079" type="box" pos="-0.4000 -1.6000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_080" type="box" pos="-0.4000 2.0000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_081" type="box" pos="-0.4000 2.4000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_082" type="box" pos="-0.4000 2.8000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_083" type="box" pos="-0.4000 3.2000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_084" type="box" pos="0.0000 -4.0000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_085" type="box" pos="0.0000 -3.6000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_086" type="box" pos="0.0000 -3.2000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_087" type="box" pos="0.0000 -2.8000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_088" type="box" pos="0.0000 -2.4000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_089" type="box" pos="0.0000 -2.0000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_090" type="box" pos="0.0000 -1.6000 0.0600" size="0.2000 0.2000 0.0600" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_091" type="box" pos="0.0000 2.0000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_092" type="box" pos="0.0000 2.4000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_093" type="box" pos="0.0000 2.8000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_094" type="box" pos="0.0000 3.2000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_095" type="box" pos="0.4000 -4.0000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_096" type="box" pos="0.4000 -3.6000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_097" type="box" pos="0.4000 -3.2000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_098" type="box" pos="0.4000 -2.8000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_099" type="box" pos="0.4000 -2.4000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_100" type="box" pos="0.4000 -2.0000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_101" type="box" pos="0.4000 -1.6000 0.0300" size="0.2000 0.2000 0.0300" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_102" type="box" pos="0.4000 2.0000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_103" type="box" pos="0.4000 2.4000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_104" type="box" pos="0.4000 2.8000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_105" type="box" pos="0.4000 3.2000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_106" type="box" pos="0.8000 2.0000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_107" type="box" pos="0.8000 2.4000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_108" type="box" pos="0.8000 2.8000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_109" type="box" pos="0.8000 3.2000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_110" type="box" pos="1.2000 2.0000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_111" type="box" pos="1.2000 2.4000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_112" type="box" pos="1.2000 2.8000 0.1100" size="0.2000 0.2000 0.1100" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_113" type="box" pos="1.2000 3.2000 0.0550" size="0.2000 0.2000 0.0550" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_114" type="box" pos="1.6000 -3.6000 0.0073" size="0.2000 0.2000 0.0073" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_115" type="box" pos="1.6000 -2.4000 0.0215" size="0.2000 0.2000 0.0215" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_116" type="box" pos="1.6000 -1.6000 0.0318" size="0.2000 0.2000 0.0318" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_117" type="box" pos="1.6000 2.4000 0.0108" size="0.2000 0.2000 0.0108" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_118" type="box" pos="1.6000 3.2000 0.0529" size="0.2000 0.2000 0.0529" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_119" type="box" pos="1.6000 3.6000 0.0446" size="0.2000 0.2000 0.0446" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_120" type="box" pos="1.6000 4.0000 0.0247" size="0.2000 0.2000 0.0247" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_121" type="box" pos="2.0000 -3.2000 0.0073" size="0.2000 0.2000 0.0073" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_122" type="box" pos="2.0000 2.0000 0.0473" size="0.2000 0.2000 0.0473" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_123" type="box" pos="2.0000 2.4000 0.0393" size="0.2000 0.2000 0.0393" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_124" type="box" pos="2.0000 3.6000 0.0313" size="0.2000 0.2000 0.0313" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_125" type="box" pos="2.0000 4.0000 0.0428" size="0.2000 0.2000 0.0428" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_126" type="box" pos="2.4000 -4.0000 0.0160" size="0.2000 0.2000 0.0160" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_127" type="box" pos="2.4000 -3.6000 0.0234" size="0.2000 0.2000 0.0234" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_128" type="box" pos="2.4000 -3.2000 0.0316" size="0.2000 0.2000 0.0316" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_129" type="box" pos="2.4000 2.0000 0.0202" size="0.2000 0.2000 0.0202" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_130" type="box" pos="2.4000 2.4000 0.0295" size="0.2000 0.2000 0.0295" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_131" type="box" pos="2.4000 3.2000 0.0359" size="0.2000 0.2000 0.0359" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_132" type="box" pos="2.8000 -3.2000 0.0089" size="0.2000 0.2000 0.0089" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_133" type="box" pos="2.8000 -2.8000 0.0217" size="0.2000 0.2000 0.0217" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_134" type="box" pos="2.8000 -2.4000 0.0135" size="0.2000 0.2000 0.0135" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_135" type="box" pos="2.8000 3.6000 0.0531" size="0.2000 0.2000 0.0531" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_136" type="box" pos="2.8000 4.0000 0.0223" size="0.2000 0.2000 0.0223" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_137" type="box" pos="3.2000 -4.0000 0.0288" size="0.2000 0.2000 0.0288" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_138" type="box" pos="3.2000 -2.8000 0.0142" size="0.2000 0.2000 0.0142" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_139" type="box" pos="3.2000 2.0000 0.0158" size="0.2000 0.2000 0.0158" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_140" type="box" pos="3.6000 -3.6000 0.0309" size="0.2000 0.2000 0.0309" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_141" type="box" pos="3.6000 -3.2000 0.0196" size="0.2000 0.2000 0.0196" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_142" type="box" pos="3.6000 -2.0000 0.0192" size="0.2000 0.2000 0.0192" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_143" type="box" pos="3.6000 1.6000 0.0551" size="0.2000 0.2000 0.0551" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_144" type="box" pos="3.6000 3.2000 0.0239" size="0.2000 0.2000 0.0239" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_145" type="box" pos="3.6000 3.6000 0.0579" size="0.2000 0.2000 0.0579" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_146" type="box" pos="3.6000 4.0000 0.0212" size="0.2000 0.2000 0.0212" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_147" type="box" pos="4.0000 -3.2000 0.0317" size="0.2000 0.2000 0.0317" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_148" type="box" pos="4.0000 -2.4000 0.0072" size="0.2000 0.2000 0.0072" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_149" type="box" pos="4.0000 -2.0000 0.0090" size="0.2000 0.2000 0.0090" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_150" type="box" pos="4.0000 2.0000 0.0474" size="0.2000 0.2000 0.0474" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_151" type="box" pos="4.0000 2.4000 0.0070" size="0.2000 0.2000 0.0070" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+    <geom group="4" material="groundplane" name="bx_152" type="box" pos="4.0000 3.2000 0.0268" size="0.2000 0.2000 0.0268" contype="1" conaffinity="1" friction="0.9 0.02 0.01"/>
+  </worldbody>
+</mujoco>

@@ -1,0 +1,273 @@
+{
+  "$comment": "Go2 训练 vs Go2 真机 的域差清单 + 信号级降级注入配置 (Go2 相关条目已随 Go2 支持一起删除)。",
+  "version": 2,
+  "sources": {
+    "go2_train_model": "/home/tc63/mujoco/mjx-go2-training/models/go2/go2_mjx_position.xml",
+    "go2_deploy_model": "sim_env/models/go2/go2.xml",
+    "contract": "docs/go2-train-deploy-parity.md"
+  },
+  "items": [
+    {
+      "id": "DG-01",
+      "category": "sensing/base-linvel",
+      "sim": "仿真: obs[0:3] 直接用 data.qvel[0:3] 世界系线速度 (oracle, 免费)",
+      "real": "Go2 真机没有基座线速度传感器 (只有 IMU + 12 路关节编码器 + 4 路足端力)",
+      "severity": "high",
+      "status": "mitigated",
+      "mitigation": "estimator.LegOdometry 用接触腿不动假设 + 腿部 FK/Jacobian 估计线速度; ObsMeta.linvel_source 标记 oracle/estimator; 健康层按置信度降级; 训练侧已做速度观测随机化 (噪声+偏置+漂移+延迟, 见训练仓 docs/go2-v7-terrain.md §9.31)",
+      "evidence": "signal_io/estimator.py; ros2_controller/obs.py:obs[0:3]; config/go2_sim.json policy_profiles._npz_note (v25b 双速度源验证)"
+    },
+    {
+      "id": "DG-02",
+      "category": "sensing/height-scan",
+      "sim": "仿真: HeightMapper 用 SimLidar 真 ray-cast 点云 (可开 self_occlusion 复刻训练遮挡模型), 未见格点用局部地面填充",
+      "real": "真机激光/深度相机有盲区、量化与噪声; 脚下近场 (vfov 下限 -0.5 rad, 安装高 0.30 m 时 r<0.55 m) 无回波",
+      "severity": "high",
+      "status": "mitigated",
+      "mitigation": "HeightMapper 与训练同定义 (yaw-only / base / clip / scale) + fill_local 中性先验; 健康层把盲区比例当 L1 输入; 真机接点云前先标定外参/安装高",
+      "evidence": "signal_io/perception.py; tests/test_perception.py; 训练仓 docs/go2-lidar-occlusion-survey.md"
+    },
+    {
+      "id": "DG-03",
+      "category": "sensing/latency-dropout",
+      "sim": "仿真: 观测零延迟、无丢帧; 策略与物理同步 50 Hz",
+      "real": "DDS/CAN 排队 1-3 拍延迟, 偶发丢包; 500 Hz LowState 抽样到 50 Hz 策略",
+      "severity": "medium",
+      "status": "mitigated",
+      "mitigation": "SignalDegrader 延迟队列 + dropout/burst 注入; health.py 看门狗 60ms->L2 / 200ms->L3; 控制器丢帧沿用上一拍或进保护",
+      "evidence": "signal_io/domain_gap.py:SignalDegrader; ros2_controller/health.py; config/domain_gap.json profiles.real_mild/real_severe"
+    },
+    {
+      "id": "DG-04",
+      "category": "sensing/obs-noise",
+      "sim": "仿真: IMU/编码器/足端力理想值; 训练侧只对 actor 加噪声 (critic 无噪)",
+      "real": "真机所有通道有噪声/零偏/量化; 编码器量化 2pi/16384≈3.8e-4 rad",
+      "severity": "medium",
+      "status": "mitigated",
+      "mitigation": "SignalDegrader 统一注入高斯噪声+偏置+量化; 训练侧已用速度观测随机化覆盖主要误差源",
+      "evidence": "signal_io/domain_gap.py; config/domain_gap.json profiles"
+    },
+    {
+      "id": "DG-05",
+      "category": "actuator/faults",
+      "sim": "仿真: 电机不会 lost/过热/通信掉线",
+      "real": "真机 LowState 带 lost 标志、温度; CAN/DDS 可能掉线, 电机可能失能",
+      "severity": "medium",
+      "status": "mitigated",
+      "mitigation": "health.py 监控 LowState 超时/NaN/lost/温度; L2 阻尼、L3 卸力锁存; SafetySupervisor 按级下发",
+      "evidence": "signal_io/msg.py MotorState(lost,temperature); ros2_controller/health.py; ros2_controller/safety.py"
+    },
+    {
+      "id": "DG-06",
+      "category": "calibration/base-height",
+      "sim": "仿真: scan_base=0.268 (Go2 训练) 为固定标定值",
+      "real": "真机站高随负载/电池变化, 若改 scan_base 会改变特征语义",
+      "severity": "medium",
+      "status": "mitigated",
+      "mitigation": "scan_base 与训练逐位一致(0.268), 不靠调 base 对齐真机; 若真机实测站高不同, 走训练/部署同步重标定",
+      "evidence": "config/go2_sim.json robots.go2.scan_base; signal_io/perception.py HeightMapper.base"
+    },
+    {
+      "id": "DG-07",
+      "category": "actuator/torque-limits",
+      "sim": "训练位置执行器 forcerange: 髋/大腿 ±23.7 N·m, 膝 ±45.43 N·m",
+      "real": "Go2 电机 ctrlrange 与之一致 (23.7/23.7/45.43 x4)",
+      "severity": "low",
+      "status": "closed",
+      "mitigation": "robot.py TORQUE_LIMITS 与 go2.xml 对齐; SafetySupervisor 再做硬限幅+斜率限幅",
+      "evidence": "sim_env/robot.py TORQUE_LIMITS; sim_env/models/go2/go2.xml ctrlrange"
+    },
+    {
+      "id": "DG-08",
+      "category": "actuator/control-law",
+      "sim": "训练 MuJoCo <position kp=20 kv=1>: tau = 20*(q_des-q) - 1*dq, 再按 forcerange 截断",
+      "real": "真机驱动器算 tau = kp*(q_des-q) + kd*(dq_des-dq) + tau; LowCmd 必须持续下发否则看门狗卸力",
+      "severity": "medium",
+      "status": "closed",
+      "mitigation": "robot.py write_cmd 复刻同一条 PD 式子 (kp=20, kd=1, tau=0); watchdog_ms 保证丢包时归零",
+      "evidence": "sim_env/robot.py:write_cmd; ros2_controller/controller.py PolicyController; config/go2_sim.json watchdog"
+    }
+  ],
+  "degrader": {
+    "$comment": "SignalDegrader 默认配置(理想链路, enabled=false 时直接透传)。",
+    "enabled": false,
+    "seed": 0,
+    "latency_steps": 0,
+    "dropout": 0,
+    "burst": {
+      "prob": 0,
+      "len": 0
+    },
+    "noise": {
+      "gyro": 0,
+      "accel": 0,
+      "rpy": 0,
+      "joint_q": 0,
+      "joint_dq": 0,
+      "foot_force": 0
+    },
+    "bias": {
+      "gyro": [
+        0,
+        0,
+        0
+      ],
+      "accel": [
+        0,
+        0,
+        0
+      ],
+      "rpy": [
+        0,
+        0,
+        0
+      ],
+      "joint_q": 0,
+      "joint_dq": 0
+    },
+    "quantization": {
+      "gyro": 0,
+      "accel": 0,
+      "rpy": 0,
+      "joint_q": 0,
+      "joint_dq": 0,
+      "foot_force": 1
+    }
+  },
+  "profiles": {
+    "sim_clean": {
+      "$comment": "仿真基线: 全 0 退化(等价 enabled=false), 用作回归对照。",
+      "enabled": true,
+      "seed": 0,
+      "latency_steps": 0,
+      "dropout": 0,
+      "noise": {
+        "gyro": 0,
+        "accel": 0,
+        "rpy": 0,
+        "joint_q": 0,
+        "joint_dq": 0,
+        "foot_force": 0
+      },
+      "bias": {
+        "gyro": [
+          0,
+          0,
+          0
+        ],
+        "accel": [
+          0,
+          0,
+          0
+        ],
+        "rpy": [
+          0,
+          0,
+          0
+        ],
+        "joint_q": 0,
+        "joint_dq": 0
+      },
+      "quantization": {
+        "gyro": 0,
+        "accel": 0,
+        "rpy": 0,
+        "joint_q": 0,
+        "joint_dq": 0,
+        "foot_force": 1
+      }
+    },
+    "real_mild": {
+      "$comment": "真机轻度退化: 1 拍延迟, 2% 丢帧, 典型 IMU/编码器噪声与量化(编码器 2pi/16384≈3.8e-4 rad)。",
+      "enabled": true,
+      "seed": 0,
+      "latency_steps": 1,
+      "dropout": 0.02,
+      "burst": {
+        "prob": 0,
+        "len": 0
+      },
+      "noise": {
+        "gyro": 0.005,
+        "accel": 0.05,
+        "rpy": 0.002,
+        "joint_q": 0.002,
+        "joint_dq": 0.02,
+        "foot_force": 2
+      },
+      "bias": {
+        "gyro": [
+          0.002,
+          -0.001,
+          0.001
+        ],
+        "accel": [
+          0.02,
+          -0.03,
+          0.05
+        ],
+        "rpy": [
+          0.001,
+          0,
+          -0.001
+        ],
+        "joint_q": 0.001,
+        "joint_dq": 0
+      },
+      "quantization": {
+        "gyro": 0.0001,
+        "accel": 0.001,
+        "rpy": 0.0001,
+        "joint_q": 0.0004,
+        "joint_dq": 0.001,
+        "foot_force": 1
+      }
+    },
+    "real_severe": {
+      "$comment": "真机重度退化: 3 拍延迟 + 15% 丢帧 + 突发丢帧, 噪声/零偏加倍, 用于压测健康层与安全监督。",
+      "enabled": true,
+      "seed": 0,
+      "latency_steps": 3,
+      "dropout": 0.15,
+      "burst": {
+        "prob": 0.02,
+        "len": 3
+      },
+      "noise": {
+        "gyro": 0.02,
+        "accel": 0.2,
+        "rpy": 0.008,
+        "joint_q": 0.006,
+        "joint_dq": 0.05,
+        "foot_force": 8
+      },
+      "bias": {
+        "gyro": [
+          0.01,
+          -0.008,
+          0.006
+        ],
+        "accel": [
+          0.08,
+          -0.12,
+          0.2
+        ],
+        "rpy": [
+          0.004,
+          0,
+          -0.003
+        ],
+        "joint_q": 0.003,
+        "joint_dq": 0
+      },
+      "quantization": {
+        "gyro": 0.0005,
+        "accel": 0.005,
+        "rpy": 0.0005,
+        "joint_q": 0.0004,
+        "joint_dq": 0.002,
+        "foot_force": 1
+      }
+    }
+  }
+}
