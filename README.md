@@ -330,7 +330,7 @@ python ros2_controller/run_controller.py --target real_sdk \
 ```text
 mjx-go2-mujoco2ros2/
 ├── ros2_controller/            # 50 Hz 控制器（run_controller / controller / obs / policy / health / safety）
-│   └── policies/               # 26 档部署 npz + .json 元数据（纯 numpy 可推理）
+│   └── policies/               # 26 档 profile 对应的部署 npz（共 50 个，含历史档）+ .json 元数据
 ├── signal_io/                  # 消息、传输（local/udp/ros2/dds）、估计器、感知、域差注入
 ├── sim_env/                    # 500 Hz MuJoCo 仿真（Go2Sim）+ 31 个地形场景 + 可视化
 │   ├── models/go2/             # go2.xml + scene*.xml + assets/ + terrains.json
