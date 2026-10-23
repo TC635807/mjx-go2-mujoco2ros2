@@ -52,7 +52,8 @@ flowchart LR
 
 ![ROS 2 节点图](assets/ros2_node_graph.png)
 
-<sub>图由 `scripts/make_ros2_node_graph.py` 生成。</sub>
+<sub>图由 `scripts/make_ros2_node_graph.py` 生成；可拖进 Drawnix 继续编辑的源文件是
+[`docs/ros2节点图.drawnix`](ros2节点图.drawnix)。</sub>
 
 - **仿真**：`go2_sim_sensors` = `sim_env/run_sim.py --publish-sensors`，把 MuJoCo 的
   500 Hz 状态发布成 `/lowstate`，并把真值 `/go2/odom`、raycast 点云

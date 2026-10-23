@@ -1,0 +1,3002 @@
+{
+ "type": "drawnix",
+ "version": 1,
+ "source": "web",
+ "elements": [
+  {
+   "id": "g_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     40,
+     110
+    ],
+    [
+     920,
+     1200
+    ]
+   ],
+   "fill": "#f8fafc",
+   "strokeColor": "#cbd5e1",
+   "strokeWidth": 2
+  },
+  {
+   "id": "h_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     64,
+     122
+    ],
+    [
+     896,
+     194
+    ]
+   ],
+   "fill": "#f8fafc",
+   "strokeColor": "#f8fafc",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "仿真 · target=sim_ros · domain 1\n",
+      "bold": true,
+      "font-size": "18",
+      "color": "#0f172a"
+     },
+     {
+      "text": "ros2 launch ros2_ws/launch/sim.launch.py duration:=30",
+      "font-size": "12",
+      "color": "#64748b"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "hline_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     64,
+     200
+    ],
+    [
+     896,
+     201
+    ]
+   ],
+   "fill": "#e2e8f0",
+   "strokeColor": "#e2e8f0",
+   "strokeWidth": 1
+  },
+  {
+   "id": "foot_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     70,
+     1150
+    ],
+    [
+     890,
+     1186
+    ]
+   ],
+   "fill": "#f8fafc",
+   "strokeColor": "#f8fafc",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "仿真链路：MuJoCo 500 Hz 物理 + 15 Hz raycast 点云；controller 用 --scan topic 消费 height_scan",
+      "font-size": "12",
+      "color": "#64748b"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "g_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1060,
+     110
+    ],
+    [
+     1940,
+     1200
+    ]
+   ],
+   "fill": "#f8fafc",
+   "strokeColor": "#cbd5e1",
+   "strokeWidth": 2
+  },
+  {
+   "id": "h_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1084,
+     122
+    ],
+    [
+     1916,
+     194
+    ]
+   ],
+   "fill": "#f8fafc",
+   "strokeColor": "#f8fafc",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "真机 · target=real_ros · domain 0\n",
+      "bold": true,
+      "font-size": "18",
+      "color": "#0f172a"
+     },
+     {
+      "text": "ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py",
+      "font-size": "12",
+      "color": "#64748b"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "hline_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1084,
+     200
+    ],
+    [
+     1916,
+     201
+    ]
+   ],
+   "fill": "#e2e8f0",
+   "strokeColor": "#e2e8f0",
+   "strokeWidth": 1
+  },
+  {
+   "id": "foot_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1090,
+     1150
+    ],
+    [
+     1910,
+     1186
+    ]
+   ],
+   "fill": "#f8fafc",
+   "strokeColor": "#f8fafc",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "真机默认：controller=stand / scan=leg_fk；确认 /utlidar/robot_pose 可靠后再开 perception + scan:=topic",
+      "font-size": "12",
+      "color": "#64748b"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "src_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     190,
+     220
+    ],
+    [
+     770,
+     430
+    ]
+   ],
+   "fill": "#f3e8fd",
+   "strokeColor": "#7b3fbf",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "go2_sim_sensors",
+      "bold": true,
+      "font-size": "20",
+      "color": "#0f172a"
+     },
+     {
+      "text": "   ① 数据源 · MuJoCo 500 Hz\n",
+      "font-size": "13",
+      "color": "#64748b"
+     },
+     {
+      "text": "物理步进 + raycast 点云 / 真值里程计\n",
+      "font-size": "14",
+      "color": "#334155"
+     },
+     {
+      "text": "文件  sim_env/run_sim.py --publish-sensors\n",
+      "font-size": "13",
+      "color": "#7b3fbf"
+     },
+     {
+      "text": "发布  /lowstate 500 Hz · /go2/odom 50 Hz · /go2/lidar/points 15 Hz\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "订阅  /lowcmd（unitree_go/LowCmd）",
+      "font-size": "14",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "bar_src_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     200,
+     236
+    ],
+    [
+     206,
+     414
+    ]
+   ],
+   "fill": "#7b3fbf",
+   "strokeColor": "#7b3fbf",
+   "strokeWidth": 1
+  },
+  {
+   "id": "per_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     190,
+     570
+    ],
+    [
+     770,
+     780
+    ]
+   ],
+   "fill": "#e6f4ea",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "go2_perception",
+      "bold": true,
+      "font-size": "20",
+      "color": "#0f172a"
+     },
+     {
+      "text": "   ② 感知 · 15 Hz\n",
+      "font-size": "13",
+      "color": "#64748b"
+     },
+     {
+      "text": "点云 + 位姿 → 高程图 → 187 点高度扫描\n",
+      "font-size": "14",
+      "color": "#334155"
+     },
+     {
+      "text": "文件  signal_io/perception_node.py\n",
+      "font-size": "13",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "订阅  /go2/lidar/points · /go2/odom\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "发布  /perception/height_scan（Float32MultiArray 15 Hz）",
+      "font-size": "14",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "bar_per_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     200,
+     586
+    ],
+    [
+     206,
+     764
+    ]
+   ],
+   "fill": "#2e7d4f",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ctrl_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     190,
+     920
+    ],
+    [
+     770,
+     1130
+    ]
+   ],
+   "fill": "#fff4e5",
+   "strokeColor": "#c77700",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "go2_controller",
+      "bold": true,
+      "font-size": "20",
+      "color": "#0f172a"
+     },
+     {
+      "text": "   ③ 控制 · 50 Hz 控制 / 500 Hz 发送\n",
+      "font-size": "13",
+      "color": "#64748b"
+     },
+     {
+      "text": "obs(243) → policy → health → safety → LowCmd\n",
+      "font-size": "14",
+      "color": "#334155"
+     },
+     {
+      "text": "文件  ros2_controller/run_controller.py --scan topic\n",
+      "font-size": "13",
+      "color": "#c77700"
+     },
+     {
+      "text": "订阅  /lowstate（unitree_go/LowState）· /perception/height_scan\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "发布  /lowcmd（unitree_go/LowCmd，12 维关节目标）\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "调试  /go2/controller/{obs,action,info}",
+      "font-size": "14",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "bar_ctrl_sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     200,
+     936
+    ],
+    [
+     206,
+     1114
+    ]
+   ],
+   "fill": "#c77700",
+   "strokeColor": "#c77700",
+   "strokeWidth": 1
+  },
+  {
+   "id": "src_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1210,
+     220
+    ],
+    [
+     1790,
+     430
+    ]
+   ],
+   "fill": "#fde8e8",
+   "strokeColor": "#c0392b",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "Go2 固件（DDS）",
+      "bold": true,
+      "font-size": "20",
+      "color": "#0f172a"
+     },
+     {
+      "text": "   ① 数据源 · 500 Hz\n",
+      "font-size": "13",
+      "color": "#64748b"
+     },
+     {
+      "text": "真机固件直出 LowState / LowCmd，无需自写 bridge\n",
+      "font-size": "14",
+      "color": "#334155"
+     },
+     {
+      "text": "文件  real_env/README.md（真机部署说明，无自写节点）\n",
+      "font-size": "13",
+      "color": "#c0392b"
+     },
+     {
+      "text": "发布  /lowstate · /utlidar/cloud（PointCloud2 ~11 Hz）\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "可选  /utlidar/robot_pose（PoseStamped，很多固件无数据）\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "订阅  /lowcmd（unitree_go/LowCmd）",
+      "font-size": "14",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "bar_src_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1220,
+     236
+    ],
+    [
+     1226,
+     414
+    ]
+   ],
+   "fill": "#c0392b",
+   "strokeColor": "#c0392b",
+   "strokeWidth": 1
+  },
+  {
+   "id": "per_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1210,
+     570
+    ],
+    [
+     1790,
+     780
+    ]
+   ],
+   "fill": "#e6f4ea",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "go2_perception",
+      "bold": true,
+      "font-size": "20",
+      "color": "#0f172a"
+     },
+     {
+      "text": "   ② 感知 · 15 Hz\n",
+      "font-size": "13",
+      "color": "#64748b"
+     },
+     {
+      "text": "点云 + 位姿 → 高程图 → 187 点高度扫描\n",
+      "font-size": "14",
+      "color": "#334155"
+     },
+     {
+      "text": "文件  signal_io/perception_node.py\n",
+      "font-size": "13",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "订阅  /utlidar/cloud · /utlidar/robot_pose（可缺）\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "发布  /perception/height_scan（Float32MultiArray 15 Hz）",
+      "font-size": "14",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "bar_per_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1220,
+     586
+    ],
+    [
+     1226,
+     764
+    ]
+   ],
+   "fill": "#2e7d4f",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ctrl_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1210,
+     920
+    ],
+    [
+     1790,
+     1130
+    ]
+   ],
+   "fill": "#fff4e5",
+   "strokeColor": "#c77700",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "go2_controller",
+      "bold": true,
+      "font-size": "20",
+      "color": "#0f172a"
+     },
+     {
+      "text": "   ③ 控制 · 50 Hz 控制 / 500 Hz 发送\n",
+      "font-size": "13",
+      "color": "#64748b"
+     },
+     {
+      "text": "obs(243) → policy → health → safety → LowCmd\n",
+      "font-size": "14",
+      "color": "#334155"
+     },
+     {
+      "text": "文件  ros2_controller/run_controller.py --scan topic\n",
+      "font-size": "13",
+      "color": "#c77700"
+     },
+     {
+      "text": "订阅  /lowstate（unitree_go/LowState）· /perception/height_scan\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "发布  /lowcmd（unitree_go/LowCmd，12 维关节目标）\n",
+      "font-size": "14",
+      "color": "#1f2937"
+     },
+     {
+      "text": "调试  /go2/controller/{obs,action,info}",
+      "font-size": "14",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "bar_ctrl_real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1220,
+     936
+    ],
+    [
+     1226,
+     1114
+    ]
+   ],
+   "fill": "#c77700",
+   "strokeColor": "#c77700",
+   "strokeWidth": 1
+  },
+  {
+   "id": "e_sim_src_per",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.5,
+     1.0
+    ],
+    "boundId": "src_sim"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.5,
+     0.0
+    ],
+    "boundId": "per_sim"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     480.0,
+     430.0
+    ],
+    [
+     480.0,
+     570.0
+    ]
+   ],
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 3
+  },
+  {
+   "id": "c_e_sim_src_per",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     370.609375,
+     458.0
+    ],
+    [
+     589.390625,
+     542.0
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "/go2/lidar/points\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "sensor_msgs/PointCloud2 · 15 Hz\n",
+      "font-size": "12",
+      "color": "#475569"
+     },
+     {
+      "text": "/go2/odom\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "nav_msgs/Odometry · 50 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "e_sim_per_ctrl",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.5,
+     1.0
+    ],
+    "boundId": "per_sim"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.5,
+     0.0
+    ],
+    "boundId": "ctrl_sim"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     480.0,
+     780.0
+    ],
+    [
+     480.0,
+     920.0
+    ]
+   ],
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 3
+  },
+  {
+   "id": "c_e_sim_per_ctrl",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     365.75,
+     825.5
+    ],
+    [
+     594.25,
+     874.5
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "/perception/height_scan\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "std_msgs/Float32MultiArray · 15 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "e_sim_src_ctrl",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.0,
+     0.5
+    ],
+    "boundId": "src_sim"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.0,
+     0.5
+    ],
+    "boundId": "ctrl_sim"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     190.0,
+     325.0
+    ],
+    [
+     115.0,
+     325.0
+    ],
+    [
+     115.0,
+     1025.0
+    ],
+    [
+     190.0,
+     1025.0
+    ]
+   ],
+   "strokeColor": "#c77700",
+   "strokeWidth": 3
+  },
+  {
+   "id": "c_e_sim_src_ctrl",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     49.8515625,
+     650.5
+    ],
+    [
+     180.1484375,
+     699.5
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#c77700",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "/lowstate\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#c77700"
+     },
+     {
+      "text": "LowState · 500 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "e_sim_ctrl_src",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     1.0,
+     0.5
+    ],
+    "boundId": "ctrl_sim"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     1.0,
+     0.5
+    ],
+    "boundId": "src_sim"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     770.0,
+     1025.0
+    ],
+    [
+     845.0,
+     1025.0
+    ],
+    [
+     845.0,
+     325.0
+    ],
+    [
+     770.0,
+     325.0
+    ]
+   ],
+   "strokeColor": "#c77700",
+   "strokeWidth": 3
+  },
+  {
+   "id": "c_e_sim_ctrl_src",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     781.0625,
+     650.5
+    ],
+    [
+     908.9375,
+     699.5
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#c77700",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "/lowcmd\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#c77700"
+     },
+     {
+      "text": "LowCmd · 500 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "e_real_src_per",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.5,
+     1.0
+    ],
+    "boundId": "src_real"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.5,
+     0.0
+    ],
+    "boundId": "per_real"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     1500.0,
+     430.0
+    ],
+    [
+     1500.0,
+     570.0
+    ]
+   ],
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 3
+  },
+  {
+   "id": "c_e_real_src_per",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1381.6328125,
+     458.0
+    ],
+    [
+     1618.3671875,
+     542.0
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "/utlidar/cloud\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "sensor_msgs/PointCloud2 · ~11 Hz\n",
+      "font-size": "12",
+      "color": "#475569"
+     },
+     {
+      "text": "/utlidar/robot_pose\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "geometry_msgs/PoseStamped · 可选",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "e_real_per_ctrl",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.5,
+     1.0
+    ],
+    "boundId": "per_real"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.5,
+     0.0
+    ],
+    "boundId": "ctrl_real"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     1500.0,
+     780.0
+    ],
+    [
+     1500.0,
+     920.0
+    ]
+   ],
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 3
+  },
+  {
+   "id": "c_e_real_per_ctrl",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1385.75,
+     825.5
+    ],
+    [
+     1614.25,
+     874.5
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "/perception/height_scan\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "std_msgs/Float32MultiArray · 15 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "e_real_src_ctrl",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.0,
+     0.5
+    ],
+    "boundId": "src_real"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.0,
+     0.5
+    ],
+    "boundId": "ctrl_real"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     1210.0,
+     325.0
+    ],
+    [
+     1135.0,
+     325.0
+    ],
+    [
+     1135.0,
+     1025.0
+    ],
+    [
+     1210.0,
+     1025.0
+    ]
+   ],
+   "strokeColor": "#c77700",
+   "strokeWidth": 3
+  },
+  {
+   "id": "c_e_real_src_ctrl",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1069.8515625,
+     650.5
+    ],
+    [
+     1200.1484375,
+     699.5
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#c77700",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "/lowstate\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#c77700"
+     },
+     {
+      "text": "LowState · 500 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "e_real_ctrl_src",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     1.0,
+     0.5
+    ],
+    "boundId": "ctrl_real"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     1.0,
+     0.5
+    ],
+    "boundId": "src_real"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     1790.0,
+     1025.0
+    ],
+    [
+     1865.0,
+     1025.0
+    ],
+    [
+     1865.0,
+     325.0
+    ],
+    [
+     1790.0,
+     325.0
+    ]
+   ],
+   "strokeColor": "#c77700",
+   "strokeWidth": 3
+  },
+  {
+   "id": "c_e_real_ctrl_src",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1801.0625,
+     650.5
+    ],
+    [
+     1928.9375,
+     699.5
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#c77700",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "/lowcmd\n",
+      "bold": true,
+      "font-size": "15",
+      "color": "#c77700"
+     },
+     {
+      "text": "LowCmd · 500 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "divider",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     990.0,
+     130
+    ],
+    [
+     991.0,
+     1180
+    ]
+   ],
+   "fill": "#dbe2ea",
+   "strokeColor": "#dbe2ea",
+   "strokeWidth": 1
+  },
+  {
+   "id": "mid_note",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     925.0,
+     536
+    ],
+    [
+     1055.0,
+     636
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "同一组话题\n",
+      "font-size": "14",
+      "color": "#64748b"
+     },
+     {
+      "text": "同一份代码\n",
+      "font-size": "14",
+      "color": "#64748b"
+     },
+     {
+      "text": "只换数据源",
+      "font-size": "14",
+      "color": "#64748b"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "viewer",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     40,
+     1225
+    ],
+    [
+     1940,
+     1305
+    ]
+   ],
+   "fill": "#eef3f8",
+   "strokeColor": "#5b6b7f",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "go2_viewer（可选，两列共用）",
+      "bold": true,
+      "font-size": "20",
+      "color": "#0f172a"
+     },
+     {
+      "text": "   只读订阅，不参与控制闭环\n",
+      "font-size": "13",
+      "color": "#64748b"
+     },
+     {
+      "text": "文件  scripts/view_ros2.py\n",
+      "font-size": "13",
+      "color": "#5b6b7f"
+     },
+     {
+      "text": "订阅  /lowstate · /lowcmd · /go2/odom · /perception/height_scan · /go2/controller/{obs,action,info}",
+      "font-size": "14",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   }
+  },
+  {
+   "id": "payloads",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     40,
+     1320
+    ],
+    [
+     1940,
+     1750
+    ]
+   ],
+   "fill": "#f7f8fa",
+   "strokeColor": "#8a949e",
+   "strokeWidth": 2
+  },
+  {
+   "id": "payloads_title",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     64,
+     1328
+    ],
+    [
+     824,
+     1358
+    ]
+   ],
+   "fill": "#f7f8fa",
+   "strokeColor": "#f7f8fa",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "话题载荷 · 每个话题里装的是什么",
+      "bold": true,
+      "font-size": "16",
+      "color": "#0f172a"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "payloads_hint",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     600,
+     1330
+    ],
+    [
+     1916,
+     1356
+    ]
+   ],
+   "fill": "#f7f8fa",
+   "strokeColor": "#f7f8fa",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "箭头 = 数据流方向 · 边标签 = 话题 + 类型 + 频率",
+      "font-size": "12",
+      "color": "#64748b"
+     }
+    ],
+    "type": "paragraph",
+    "align": "right"
+   }
+  },
+  {
+   "id": "table_head_bg",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1370
+    ],
+    [
+     1920,
+     1398
+    ]
+   ],
+   "fill": "#e2e8f0",
+   "strokeColor": "#e2e8f0",
+   "strokeWidth": 1
+  },
+  {
+   "id": "table_head_0",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1370
+    ],
+    [
+     356,
+     1398
+    ]
+   ],
+   "fill": "#e2e8f0",
+   "strokeColor": "#e2e8f0",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "话题",
+      "bold": true,
+      "font-size": "13",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "table_head_1",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1370
+    ],
+    [
+     772,
+     1398
+    ]
+   ],
+   "fill": "#e2e8f0",
+   "strokeColor": "#e2e8f0",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "类型 · 频率",
+      "bold": true,
+      "font-size": "13",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "table_head_2",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1370
+    ],
+    [
+     1902,
+     1398
+    ]
+   ],
+   "fill": "#e2e8f0",
+   "strokeColor": "#e2e8f0",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "数据内容（payload）",
+      "bold": true,
+      "font-size": "13",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_0",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1402
+    ],
+    [
+     1920,
+     1434
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_0",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1402
+    ],
+    [
+     356,
+     1434
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#c77700"
+     },
+     {
+      "text": "/lowstate",
+      "bold": true,
+      "font-size": "13",
+      "color": "#c77700"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_0",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1402
+    ],
+    [
+     772,
+     1434
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "unitree_go/LowState · 500 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_0",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1402
+    ],
+    [
+     1902,
+     1434
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "tick · IMU 四元数/角速度/加速度/rpy · 12×(q, dq, τ_est, 温度) · 4 足端力 · bit_flag",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_1",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1434
+    ],
+    [
+     1920,
+     1466
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_1",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1434
+    ],
+    [
+     356,
+     1466
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#c77700"
+     },
+     {
+      "text": "/lowcmd",
+      "bold": true,
+      "font-size": "13",
+      "color": "#c77700"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_1",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1434
+    ],
+    [
+     772,
+     1466
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "unitree_go/LowCmd · 500 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_1",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1434
+    ],
+    [
+     1902,
+     1466
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "mode_pr / mode_machine · 12×(q_des, dq_des, kp, kd, τ_ff) · CRC32",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_2",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1466
+    ],
+    [
+     1920,
+     1498
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_2",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1466
+    ],
+    [
+     356,
+     1498
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "/go2/odom",
+      "bold": true,
+      "font-size": "13",
+      "color": "#2e7d4f"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_2",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1466
+    ],
+    [
+     772,
+     1498
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "nav_msgs/Odometry · 50 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_2",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1466
+    ],
+    [
+     1902,
+     1498
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "pose(position + orientation) · twist.linear(vx, vy, vz) · frame=world → base_link",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_3",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1498
+    ],
+    [
+     1920,
+     1530
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_3",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1498
+    ],
+    [
+     356,
+     1530
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "/go2/lidar/points",
+      "bold": true,
+      "font-size": "13",
+      "color": "#2e7d4f"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_3",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1498
+    ],
+    [
+     772,
+     1530
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "sensor_msgs/PointCloud2 · 15 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_3",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1498
+    ],
+    [
+     1902,
+     1530
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "xyz 点云（raycast 采样，frame=world）",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_4",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1530
+    ],
+    [
+     1920,
+     1562
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_4",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1530
+    ],
+    [
+     356,
+     1562
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "/utlidar/cloud",
+      "bold": true,
+      "font-size": "13",
+      "color": "#2e7d4f"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_4",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1530
+    ],
+    [
+     772,
+     1562
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "sensor_msgs/PointCloud2 · ~11 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_4",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1530
+    ],
+    [
+     1902,
+     1562
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "xyz 点云（L1 雷达，frame=utlidar_lidar）",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_5",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1562
+    ],
+    [
+     1920,
+     1594
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_5",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1562
+    ],
+    [
+     356,
+     1594
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "/utlidar/robot_pose",
+      "bold": true,
+      "font-size": "13",
+      "color": "#2e7d4f"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_5",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1562
+    ],
+    [
+     772,
+     1594
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "geometry_msgs/PoseStamped · 可选",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_5",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1562
+    ],
+    [
+     1902,
+     1594
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "position + orientation（很多固件无数据）",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_6",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1594
+    ],
+    [
+     1920,
+     1626
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_6",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1594
+    ],
+    [
+     356,
+     1626
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#2e7d4f"
+     },
+     {
+      "text": "/perception/height_scan",
+      "bold": true,
+      "font-size": "13",
+      "color": "#2e7d4f"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_6",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1594
+    ],
+    [
+     772,
+     1626
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "std_msgs/Float32MultiArray · 15 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_6",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1594
+    ],
+    [
+     1902,
+     1626
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "187 = 17×11 · clip(z_base − h_ground − 0.268, ±0.35) × 5（负 = 前方更高）",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_7",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1626
+    ],
+    [
+     1920,
+     1658
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_7",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1626
+    ],
+    [
+     356,
+     1658
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#94a3b8"
+     },
+     {
+      "text": "/go2/controller/obs",
+      "bold": true,
+      "font-size": "13",
+      "color": "#94a3b8"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_7",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1626
+    ],
+    [
+     772,
+     1658
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "std_msgs/Float32MultiArray · 50 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_7",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1626
+    ],
+    [
+     1902,
+     1658
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "243 = 48 本体（v/ω/重力/指令/q/dq/上一动作）+ 187 扫描 + 8 相位",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_8",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1658
+    ],
+    [
+     1920,
+     1690
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_8",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1658
+    ],
+    [
+     356,
+     1690
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#94a3b8"
+     },
+     {
+      "text": "/go2/controller/action",
+      "bold": true,
+      "font-size": "13",
+      "color": "#94a3b8"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_8",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1658
+    ],
+    [
+     772,
+     1690
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "std_msgs/Float32MultiArray · 50 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_8",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1658
+    ],
+    [
+     1902,
+     1690
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "12 维关节位置目标（策略原始输出，送 safety 前）",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "trow_9",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     60,
+     1690
+    ],
+    [
+     1920,
+     1722
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1
+  },
+  {
+   "id": "ttopic_9",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     80,
+     1690
+    ],
+    [
+     356,
+     1722
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "●  ",
+      "font-size": "12",
+      "color": "#94a3b8"
+     },
+     {
+      "text": "/go2/controller/info",
+      "bold": true,
+      "font-size": "13",
+      "color": "#94a3b8"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "ttype_9",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     388,
+     1690
+    ],
+    [
+     772,
+     1722
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "std_msgs/String · 10 Hz",
+      "font-size": "12",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "tpay_9",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     808,
+     1690
+    ],
+    [
+     1902,
+     1722
+    ]
+   ],
+   "fill": "#f5f8fc",
+   "strokeColor": "#f5f8fc",
+   "strokeWidth": 1,
+   "text": {
+    "children": [
+     {
+      "text": "JSON：level / mode / 速度来源 / 策略统计 / timestamp",
+      "font-size": "13",
+      "color": "#1f2937"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "title",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     44,
+     10
+    ],
+    [
+     804,
+     52
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "ROS 2 节点图：仿真 / 真机同构",
+      "bold": true,
+      "font-size": "28",
+      "color": "#0f172a"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "subtitle",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     44,
+     56
+    ],
+    [
+     1344,
+     86
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "同一组话题名、同一份 perception / controller；每条边标话题/类型/频率，底部表列出每个话题的载荷",
+      "font-size": "14",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "leg_line_0",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1370,
+     44
+    ],
+    [
+     1410,
+     48
+    ]
+   ],
+   "fill": "#2e7d4f",
+   "strokeColor": "#2e7d4f",
+   "strokeWidth": 1
+  },
+  {
+   "id": "leg_text_0",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1418,
+     36
+    ],
+    [
+     1490,
+     60
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "感知数据",
+      "font-size": "13",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  },
+  {
+   "id": "leg_line_1",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1520,
+     44
+    ],
+    [
+     1560,
+     48
+    ]
+   ],
+   "fill": "#c77700",
+   "strokeColor": "#c77700",
+   "strokeWidth": 1
+  },
+  {
+   "id": "leg_text_1",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "points": [
+    [
+     1568,
+     36
+    ],
+    [
+     1640,
+     60
+    ]
+   ],
+   "fill": "#ffffff",
+   "strokeColor": "#ffffff",
+   "strokeWidth": 2,
+   "text": {
+    "children": [
+     {
+      "text": "控制数据",
+      "font-size": "13",
+      "color": "#475569"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   }
+  }
+ ],
+ "viewport": {
+  "zoom": 0.45,
+  "origination": [
+   10,
+   10
+  ]
+ },
+ "theme": {
+  "themeColorMode": "default"
+ }
+}

@@ -86,7 +86,8 @@
 <img src="docs/assets/系统架构图.png" alt="项目架构总览" width="100%" />
 
 <sub>图由 `scripts/make_architecture_diagram.py` 生成；可编辑源文件是
-`docs/系统架构图.drawnix`；ROS 2 节点图由 `scripts/make_ros2_node_graph.py` 生成。
+`docs/系统架构图.drawnix`；ROS 2 节点图由 `scripts/make_ros2_node_graph.py` 生成
+（可编辑源文件是 `docs/ros2节点图.drawnix`）。
 完整的模块职责、目录说明与扩展点见 [**docs/architecture.md**](docs/architecture.md)。</sub>
 
 - **50 Hz 控制层**（`ros2_controller/`）：`obs.py` 构造 243 维观测 → `policy.py` 纯 numpy
