@@ -1,78 +1,151 @@
 #!/usr/bin/env bash
-# Go2 交付策略的**可视化检查**入口。包装 scripts/view_policy.py, 把该开的开关都开对。
+# Go2 观测入口：**自动拉起 ROS 2 节点图**，再用观察器节点订阅真实话题。
 #
-# 默认交付模型 = v25b (2026-10-20: 1024-512 + 速度观测随机化 + 地形课程, 真竖面 80.0% /
-# hfield 78.9% / 碎石 80.7%, 平地 CPU 100%, 部署 oracle/estimator 双源稳定).
-# 回滚/实验档: v20 (79.7/78.8/71.7) / v24 / v25a (仿真 82.4/80.1/83.8 但部署 oracle 绕圈).
-# 上一版: v13 (竖面几何训练 —— 混合地形 hyb2 上训练, 真竖面
-# box geom 的 boxes/stairs + hfield 的 rough/slope; 187 点扫描 + 真机 L1 感知链路 raycast)。
-# 旧模型可回滚: PROFILE=go2_v6 bash scripts/view_go2_policy.sh   (hfield 口径更好)
-#              PROFILE=go2_v4 SCAN=nominal bash scripts/view_go2_policy.sh
+#   启动:  sim_sensors（MuJoCo） + perception + controller
+#   观察:  go2_viewer（只订阅 /lowstate、/lowcmd、/go2/odom、
+#          /perception/height_scan、/go2/controller/{obs,action,info}）
 #
 # 用法:
-#   bash scripts/view_go2_policy.sh                       # 平地, 开 3D 窗口
-#   bash scripts/view_go2_policy.sh --terrain hyb2        # 地形 (3x3 混合: 竖面+rough)
-#   bash scripts/view_go2_policy.sh --terrain rubble      # 碎石
-#   bash scripts/view_go2_policy.sh --terrain big1        # 5x5 大混合 (v23/v25 训练地形)
-#   bash scripts/view_go2_policy.sh --list-terrains       # 列出全部地形
-#   bash scripts/view_go2_policy.sh --duration 30
-#   bash scripts/view_go2_policy.sh --headless            # 无 GUI: 终端 ANSI 仪表盘
-#   bash scripts/view_go2_policy.sh --obstacles           # 旧障碍场景
-#   bash scripts/view_go2_policy.sh --record logs/go2_view   # 落盘 CSV + summary.png
-#   PROFILE=go2_v20 bash scripts/view_go2_policy.sh       # 回滚模型
+#   bash scripts/view_go2_policy.sh                          # 平地，一直跑到关窗口/Ctrl-C
+#   bash scripts/view_go2_policy.sh --terrain wide_h050
+#   bash scripts/view_go2_policy.sh --duration 20
+#   bash scripts/view_go2_policy.sh --headless --duration 10
+#   bash scripts/view_go2_policy.sh --record logs/go2_view
+#   PROFILE=go2_v29c bash scripts/view_go2_policy.sh
+#   bash scripts/view_go2_policy.sh --local                  # 旧的单进程观察器
 #
-# 窗口里键盘: w/s=前进速度 ±0.1 (0~1.0)  a/d=转向 ±0.2 rad/s (-1~1)
-#             r=重置(地形上会重新在外圈平地出生)  空格=暂停  h=3D叠加  f=曲线  i=仪表盘  q=退出
-# 3D 窗口里能看到: 187 个高度采样点(按特征着色) / 足端接触 / 速度与指令箭头 / 轨迹;
-# 另外三块是 tau·高度·速度曲线、17x11 高度热图、243 维 obs 分段条、健康等级 HUD。
-set -euo pipefail
+# 注意：本脚本会自动 source ROS 2 与 ros2_ws/install。没有 ROS 2 时用 --local。
+set -eo pipefail
 cd "$(dirname "$0")/.."
+ROOT="$(pwd)"
 
-# 单线程 BLAS 必须钉死: 1024-512 策略前向在默认 OpenBLAS 线程数下实测 12 ms/次(并占满 12~16 核),
-# 单线程 0.21 ms/次。50 Hz 控制预算 20 ms —— 多线程小矩阵纯属浪费, 实测把观察器 RTF 从 1.0 压到 0.3。
-# (python 入口里也 setdefault 了一层, 这里导出是为了兜住任何子进程。)
-export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
-export NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
-
-# 默认一直跑(按 Q / 关窗口退出); --duration N 指定自动退出
 DUR=0
-SCENE=flat
-EXTRA=()
-REC=""
+TERRAIN=flat
 PROFILE="${PROFILE:-go2_v33d}"
-SCAN="${SCAN:-raycast}"
+CMD_STR=""
+HEADLESS=0
+REC=""
+HAS_MODEL=0
+VIEW_ARGS=()
+
+usage() {
+  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+  exit 0
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --local|--legacy)
+      exec bash "$ROOT/scripts/view_go2_policy_local.sh" "${@:2}"
+      ;;
     --duration) DUR="$2"; shift 2 ;;
-    --headless) EXTRA+=(--headless); shift ;;
-    --obstacles) SCENE=obstacles; shift ;;
+    --terrain) TERRAIN="$2"; shift 2 ;;
+    --profile) PROFILE="$2"; shift 2 ;;
+    --cmd) CMD_STR="$2 $3 $4"; shift 4 ;;
+    --headless) HEADLESS=1; shift ;;
     --record) REC="$2"; shift 2 ;;
-    *) EXTRA+=("$1"); shift ;;
+    --follow) VIEW_ARGS+=(--follow); shift ;;
+    --trail) VIEW_ARGS+=(--trail "$2"); shift 2 ;;
+    --sync-hz) VIEW_ARGS+=(--sync-hz "$2"); shift 2 ;;
+    --plot-hz) VIEW_ARGS+=(--plot-hz "$2"); shift 2 ;;
+    --plots) VIEW_ARGS+=(--plots "$2"); shift 2 ;;
+    --model) VIEW_ARGS+=(--model "$2"); HAS_MODEL=1; shift 2 ;;
+    --scene) VIEW_ARGS+=(--scene "$2"); shift 2 ;;
+    --robot-style) VIEW_ARGS+=(--robot-style "$2"); shift 2 ;;
+    --lite) VIEW_ARGS+=(--lite "$2"); shift 2 ;;
+    --list-terrains)
+      "$ROOT/.venv/bin/python" - <<'PY'
+import json
+p = "sim_env/models/go2/terrains.json"
+d = json.load(open(p, encoding="utf-8"))
+for e in d.get("terrains", []):
+    print("%-14s %s" % (e.get("name", "?"), e.get("desc", "")))
+PY
+      exit 0
+      ;;
+    -h|--help) usage ;;
+    *)
+      echo "[view] 未知参数: $1" >&2
+      echo "[view] 旧版单进程参数请加 --local，例如: bash scripts/view_go2_policy.sh --local --obstacles" >&2
+      exit 2
+      ;;
   esac
 done
 
-ARGS=(--robot go2 --controller policy --scene "$SCENE" --duration "$DUR"
-      --policy-profile "$PROFILE"
-      --linvel oracle          # 仿真用真值速度: 训练 obs 0:3 就是 qvel[0:3]
-      --scan "$SCAN"           # v6 默认 raycast: SimLidar + HeightMapper 真感知链路
-      --cmd 0.5 0 0            # 前进 0.5 m/s (训练里 vx∈[0,1.0])
-      --follow)
-if [[ -n "$REC" ]]; then
-  ARGS+=(--record "$REC" --json "$REC/summary.json")
+source /opt/ros/lyrical/setup.bash
+if [[ -f "$ROOT/ros2_ws/install/setup.bash" ]]; then
+  source "$ROOT/ros2_ws/install/setup.bash"
 fi
-echo "== Go2 策略闭环检查 =="
-echo "  策略 : profile=$PROFILE  (档位见 config/go2_sim.json 的 policy_profiles; 默认 v33d; 回退: PROFILE=go2_v29c / go2_v25b)"
-echo "  物理 : CPU MuJoCo 500Hz / 策略 50Hz / 健康+安全 100Hz(分频) / motor+PD kp=20 kd=1 / 足端硬接触(与训练一致)"
-echo "  速度 : oracle(真值)   高程: $SCAN (raycast = 真机 L1 几何 + 机体自遮挡 + 高程图记忆; 900射线@15Hz)"
-echo "  地形 : 默认平地 (--terrain <名字> 切地形, --list-terrains 看全部)"
-echo "  指令 : 初始 vx=0.5 m/s (窗口里 W/S 调速, A/D 转向, Q 退出)"
-echo "  时长 : 默认一直跑直到 Q；--duration N 自动退出"
-echo "  画面 : 60 Hz 刷新(仿真时间; --sync-hz 可调) | 默认关仪表盘图像(--dashboard 开)"
-if command -v xdpyinfo >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
-  echo "  显示 : DISPLAY=$DISPLAY (WSLg) -> 开 3D 窗口"
-else
-  echo "  显示 : 无 DISPLAY -> 建议加 --headless"
-fi
-echo
+export PYTHONPATH="${PYTHONPATH:-}:/usr/lib/python3/dist-packages"
+export ROS_DOMAIN_ID=1
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 
-exec /home/tc63/mujoco/.venv/bin/python scripts/view_policy.py "${ARGS[@]}" "${EXTRA[@]}"
+mkdir -p "$ROOT/logs"
+LOG="$ROOT/logs/view_ros2_launch.log"
+echo "[view] 启动 ROS 2 节点图: sim_sensors + perception + controller"
+LAUNCH_ARGS=(duration:="$DUR" terrain:="$TERRAIN" profile:=sim_clean
+             viewer:=false policy_profile:="$PROFILE")
+if [[ -n "$CMD_STR" ]]; then
+  LAUNCH_ARGS+=(cmd:="$CMD_STR")
+fi
+ros2 launch ros2_ws/launch/sim.launch.py "${LAUNCH_ARGS[@]}" >"$LOG" 2>&1 &
+LAUNCH_PID=$!
+
+cleanup() {
+  if kill -0 "$LAUNCH_PID" 2>/dev/null; then
+    kill -INT "$LAUNCH_PID" 2>/dev/null || true
+    for _ in $(seq 1 50); do
+      kill -0 "$LAUNCH_PID" 2>/dev/null || break
+      sleep 0.1
+    done
+    kill -TERM "$LAUNCH_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+# 等节点图把话题挂起来（最多 10 s）
+for _ in $(seq 1 50); do
+  if ros2 topic list 2>/dev/null | grep -qx "/lowstate"; then
+    break
+  fi
+  sleep 0.2
+done
+if ! kill -0 "$LAUNCH_PID" 2>/dev/null; then
+  echo "[view] ROS 2 launch 提前退出，日志尾部:" >&2
+  tail -30 "$LOG" >&2 || true
+  exit 1
+fi
+
+# 地形模式：观察器要加载同一份地形 scene，否则 3D 里的地面/障碍物对不上
+if [[ "$TERRAIN" != "flat" && "$HAS_MODEL" == "0" ]]; then
+  TERRAIN_SCENE=$("$ROOT/.venv/bin/python" - "$TERRAIN" <<'PY'
+import json, os, sys
+root = os.getcwd()
+name = sys.argv[1]
+d = json.load(open("sim_env/models/go2/terrains.json", encoding="utf-8"))
+for e in d.get("terrains", []):
+    if e.get("name") == name:
+        p = e["scene"]
+        print(p if os.path.isabs(p) else os.path.join(root, p))
+        break
+else:
+    sys.exit(1)
+PY
+) || { echo "[view] 找不到地形场景: $TERRAIN" >&2; exit 1; }
+  VIEW_ARGS+=(--model "$TERRAIN_SCENE")
+fi
+
+VIEW_CMD=("$ROOT/.venv/bin/python" "$ROOT/scripts/view_ros2.py"
+          --target sim_ros --truth --duration "$DUR" "${VIEW_ARGS[@]}")
+if [[ "$HEADLESS" == "1" ]]; then
+  VIEW_CMD+=(--headless)
+fi
+if [[ -n "$REC" ]]; then
+  VIEW_CMD+=(--record "$REC")
+fi
+
+echo "[view] 观察器节点 -> /lowstate + /perception/height_scan + /go2/controller/*"
+echo "[view] launch 日志: $LOG"
+"${VIEW_CMD[@]}"

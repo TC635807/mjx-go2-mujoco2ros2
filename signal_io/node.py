@@ -146,7 +146,7 @@ class SimNode:
     def run(self, duration: float, realtime: bool = True, viewer: bool = False,
             viewer_every: int = 10, on_step: Optional[Callable[[Go2Sim], None]] = None,
             log_path: Optional[str] = None) -> Dict[str, object]:
-        n_steps = int(round(duration / self.dt))
+        n_steps = None if duration <= 0 else int(round(duration / self.dt))
         vw = None
         if viewer:
             import mujoco.viewer
@@ -163,7 +163,8 @@ class SimNode:
                       + ",".join("q%d" % i for i in range(NUM_JOINT)) + ","
                       + ",".join("tau%d" % i for i in range(NUM_JOINT)) + "\n")
         try:
-            for k in range(n_steps):
+            k = 0
+            while n_steps is None or k < n_steps:
                 st = self.tick()
                 if on_step is not None:
                     on_step(self.sim)
@@ -179,6 +180,7 @@ class SimNode:
                         break
                     vw.sync()
                 pacer.tick()
+                k += 1
         finally:
             if log is not None:
                 log.close()
@@ -206,7 +208,7 @@ class ControllerNode:
 
     def __init__(self, transport: Transport, controller: BaseController, sim_dt: float = 0.002,
                  control_dt: float = 0.02, verbose: bool = True,
-                 health=None, supervisor=None) -> None:
+                 health=None, supervisor=None, on_control=None) -> None:
         self.tr = transport
         self.ctrl = controller
         self.dt = float(sim_dt)
@@ -215,6 +217,8 @@ class ControllerNode:
         # 健康层（判等级）与安全层（按等级出指令）都是可选的：关掉就退回 v1 的纯直通行为。
         self.health = health
         self.supervisor = supervisor
+        # 每个 50 Hz 控制拍之后回调：给 ROS 2 debug 发布器 / 观察器节点用
+        self.on_control = on_control
         self.n_state = 0
         self.n_cmd = 0
         self._state: Optional[LowState] = None
@@ -225,39 +229,82 @@ class ControllerNode:
         self.mode_hist: Dict[str, int] = {}
         self.first_level = None
 
-    def _now(self, t_wall: float) -> float:
-        st = self._state
-        if st is not None and st.sim_time > 0:
-            return float(st.sim_time)
-        return float(t_wall)
+    def _damping_cmd(self) -> LowCmd:
+        """全关节阻尼指令（kp=0, kd=8），真机退出/急停收尾用。
+
+        对应官方 unitree_rl_gym 的 create_damping_cmd：不发零力矩直接断流，
+        固件行为未公开（保持最后指令 or 卸力）；先主动发阻尼更安全。
+        """
+        cmd = LowCmd()
+        for i in range(NUM_JOINT):
+            m = cmd.motor_cmd[i]
+            m.mode, m.q, m.dq, m.tau, m.kp, m.kd = 0x01, 0.0, 0.0, 0.0, 0.0, 8.0
+        return cmd
+
+    def emergency_stop(self, ticks: int = 50) -> bool:
+        """发 ticks 拍阻尼（默认 50 拍 = 100 ms @ 500 Hz）再停止发布。"""
+        if self._state is None:
+            return False
+        cmd = self._damping_cmd()
+        n = max(1, int(ticks))
+        for _ in range(n):
+            self.tr.publish_cmd(cmd)
+            time.sleep(self.dt)
+        self.n_cmd += n
+        return True
 
     def run(self, duration: float, realtime: bool = True) -> Dict[str, object]:
-        n_steps = int(round(duration / self.dt))
+        n_steps = None if duration <= 0 else int(round(duration / self.dt))
         pacer = Pacer(self.dt, enabled=realtime)
         t_ctrl0 = time.monotonic()
         health_state = None
-        for k in range(n_steps):
+        k = 0
+        clock = 0.0          # 逻辑时钟：新鲜状态用 sim_time/tick，断流后按 dt 推进
+        n_no_state = 0
+        warned_no_state = False
+        while n_steps is None or k < n_steps:
             st = self.tr.recv_state()
-            if st is not None:
+            fresh = st is not None
+            if fresh:
                 self._state = st
                 self.n_state += 1
-            # 还没收到过任何 LowState 之前，**一个字节都不发**。
-            # 否则第一拍会下发 LowCmd().zero()（kp=kd=tau=0），仿真侧一收到就交接，
-            # 机器人瞬间失去支撑直接趴下 —— 这是很真实的"控制器先起还是机器人先起"顺序问题。
+                n_no_state = 0
+            else:
+                n_no_state += 1
+            wall = time.monotonic() - t_ctrl0
+            # 时钟必须单调推进：否则 LowState 一断流，health 的 state_age 会冻结，
+            # L2/L3 永远不触发（真机上就是网线掉了还在一直发最后一条指令）。
+            if fresh and st is not None and float(st.sim_time) > 0.0:
+                clock = max(clock, float(st.sim_time))
+            else:
+                clock = max(clock + self.dt, wall)
+            # 还没收到过任何 LowState 之前，**一个字节都不发**，但计时照走（duration 必须生效）。
             if self._state is None:
+                if not warned_no_state and n_no_state * self.dt >= 1.0:
+                    print("[ctrl] ⚠ 等待 /lowstate 超时（>1 s）：检查网线 / 网段 / domain / 网卡 / 话题名")
+                    warned_no_state = True
                 pacer.tick()
+                k += 1
                 continue
-            now = self._now(time.monotonic() - t_ctrl0)
+            now = clock
             if self.health is not None:
-                health_state = self.health.check(self._state, now)
+                # 断流后传 None：health 用自己记录的"最后一次收到状态"的时间判 age；
+                # 传旧 state 会每拍刷新 _state_stamp，导致 state_age 恒 0、永不升级。
+                health_state = self.health.check(self._state if fresh else None, now)
                 self.level_hist[health_state.level_name] = \
                     self.level_hist.get(health_state.level_name, 0) + 1
                 if self.first_level is None:
                     self.first_level = health_state.level_name
-            if self._state is not None and k % self.decim == 0:
-                # 仿真在环时用仿真时钟（确定性）；接真机时 LowState 没有 sim_time，退回墙钟
+            if k % self.decim == 0:
                 self._cmd = self.ctrl.update(self._state, now)
                 self._k += 1
+                if self.on_control is not None:
+                    try:
+                        self.on_control(self._state, self._cmd, self.ctrl,
+                                        health_state, self.supervisor, now)
+                    except Exception as exc:   # 调试发布不能让控制回路挂掉
+                        if self.verbose:
+                            print("[ctrl] on_control 异常:", repr(exc)[:160])
             cmd = self._cmd
             if self.supervisor is not None and health_state is not None:
                 cmd = self.supervisor.process(cmd, health_state, now, self.dt)
@@ -265,7 +312,9 @@ class ControllerNode:
             self.tr.publish_cmd(cmd)
             self.n_cmd += 1
             pacer.tick()
+            k += 1
         out = {"pacer": pacer.stats(), "n_state": self.n_state, "n_cmd": self.n_cmd,
+               "n_no_state": n_no_state, "ever_state": self._state is not None,
                "control_ticks": self._k, "controller": self.ctrl.stats(),
                "transport": self.tr.stats()}
         if self.health is not None:

@@ -62,6 +62,11 @@ DEFAULT_HEALTH_CFG: Dict[str, object] = {
     "optional_channels": ("cmd_vel", "height_scan"),  # 缺失只降 L1 的通道
     "confidence_channel": "linvel_conf",              # 估计速度置信度通道名
     "confidence_min": 0.3,                            # 置信度低于此值 -> L1
+    # 真机 LowState 自带的电机健康信号（仿真里恒 0，不影响仿真）
+    "check_motor_health": True,   # motor_state[i].lost / temperature
+    "temp_warn_c": 70.0,          # 电机温度 >= 此值 -> L1
+    "temp_max_c": 85.0,           # 电机温度 >= 此值 -> L2
+    "check_bit_flag": True,       # LowState.bit_flag: bit0 指令超时 / bit7 电机超时 -> L2
 }
 
 
@@ -127,6 +132,10 @@ class HealthMonitor:
         self.optional_channels = frozenset(self.cfg.get("optional_channels") or ())
         self.confidence_channel = str(self.cfg.get("confidence_channel") or "")
         self.confidence_min = float(self.cfg.get("confidence_min", 0.0))
+        self.check_motor_health = bool(self.cfg.get("check_motor_health", True))
+        self.temp_warn_c = float(self.cfg.get("temp_warn_c", 70.0))
+        self.temp_max_c = float(self.cfg.get("temp_max_c", 85.0))
+        self.check_bit_flag = bool(self.cfg.get("check_bit_flag", True))
 
         self._clear(0.0)
         self._initialized = False   # 首次 check() 自动把时基对齐到 now
@@ -261,6 +270,29 @@ class HealthMonitor:
                 tilt_deg = float(np.degrees(np.max(np.abs(rpy_arr[:2]))))
                 if tilt_deg > self.max_tilt_deg:
                     hits.append((Level.L3_ESTOP, "tilt=%.1fdeg>%.1f" % (tilt_deg, self.max_tilt_deg)))
+
+            # --- 真机才有的电机健康信号（仿真里 lost=0 / temperature=0 / bit_flag=0）
+            if self.check_motor_health:
+                lost = [i for i in range(NUM_JOINT)
+                        if int(getattr(state.motor_state[i], "lost", 0))]
+                if lost:
+                    hits.append((Level.L2_PROTECT, "motor_lost=%s" % lost[:6]))
+                temps = [int(getattr(state.motor_state[i], "temperature", 0))
+                         for i in range(NUM_JOINT)]
+                tmax = max(temps) if temps else 0
+                if tmax >= self.temp_max_c:
+                    hits.append((Level.L2_PROTECT,
+                                 "motor_temp=%dC>=%.0f" % (tmax, self.temp_max_c)))
+                elif tmax >= self.temp_warn_c:
+                    hits.append((Level.L1_DEGRADED,
+                                 "motor_temp=%dC>=%.0f" % (tmax, self.temp_warn_c)))
+            if self.check_bit_flag:
+                bf = int(getattr(state, "bit_flag", 0)) & 0xFF
+                if bf & 0x01:
+                    # 机器人自己报"操作指令超时"：说明我们的 lowcmd 没按预期到达
+                    hits.append((Level.L2_PROTECT, "robot_cmd_timeout(bit_flag=0x%02X)" % bf))
+                if bf & 0x80:
+                    hits.append((Level.L2_PROTECT, "motor_timeout(bit_flag=0x%02X)" % bf))
         channels["state"] = Channel(name="state", value=q12, stamp=self._state_stamp,
                                     valid=state_ok, sigma=0.0, age_s=state_age)
 

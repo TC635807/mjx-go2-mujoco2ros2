@@ -1,19 +1,25 @@
 """ROS 2 后端：rclpy + unitree_ros2 的 unitree_go/msg。
 
+话题名（重要）: ROS 2 层用 **/lowcmd、/lowstate**，与 unitree_ros2 官方例程
+（go2_stand_example.cpp 里的 `#define TOPIC_LOWCMD "/lowcmd"`）一致。
+rmw_cyclonedds_cpp 会把 ROS 2 话题映射成 DDS 话题 "rt/" + 名字，也就是机器人固件
+真正监听的 rt/lowcmd、rt/lowstate。所以 **不要**在 ROS 2 层写 "rt/lowcmd"
+（那会变成 DDS 的 rt/rt/lowcmd，真机收不到）。
+
 和 DDS 后端的关系: unitree_ros2 本身就是 CycloneDDS 上的 ROS 2 封装
-（rmw_cyclonedds_cpp），话题名 rt/lowcmd / rt/lowstate 与真机一致，
-所以仿真和真机之间只差 ROS_DOMAIN_ID 和网卡。
+（rmw_cyclonedds_cpp），所以仿真和真机之间只差 ROS_DOMAIN_ID 和网卡。
 
 装好 ROS 2 之后:
     source /opt/ros/lyrical/setup.bash
     export ROS_DOMAIN_ID=1                 # 仿真；真机默认是 0
-    python scripts/run_sim.py --transport ros2 --duration 20 --viewer
+    python sim_env/run_sim.py --target sim_ros --duration 20 --viewer
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
+from ..go2_crc import lowcmd_crc
 from ..msg import NUM_MOTOR, IMUState, LowCmd, LowState, MotorCmd, MotorState
 from .base import Transport
 
@@ -33,11 +39,14 @@ class Ros2Transport(Transport):
     name = "ros2"
 
     def __init__(self, domain_id: int = 1, crc_check: bool = True,
-                 cmd_topic: str = "rt/lowcmd", state_topic: str = "rt/lowstate",
-                 node_name: str = "go2_controller", role: str = "controller"):
+                 cmd_topic: str = "/lowcmd", state_topic: str = "/lowstate",
+                 node_name: str = "go2_controller", role: str = "controller",
+                 tick_dt: float = 0.002):
         self.role = role
         self.domain_id = int(domain_id)
         self.crc_check = bool(crc_check)
+        # LowState.tick 每 +1 的秒数：仿真 = 2 ms/物理步，真机固件 = 1 ms
+        self.tick_dt = float(tick_dt)
         self.cmd_topic = cmd_topic
         self.state_topic = state_topic
         self.node_name = node_name
@@ -48,6 +57,10 @@ class Ros2Transport(Transport):
         self._n_cmd_rx = 0
         self._n_drained = 0
         self._max_drain = 0
+        # 真机固件校验 LowCmd.crc；这里按 unitree_go LowCmd_ 的 812 字节布局算
+        self._n_bad_crc = 0
+        self._crc_key = None
+        self._crc_val = 0
         self._load()
 
     def _load(self) -> None:
@@ -71,6 +84,12 @@ class Ros2Transport(Transport):
         if not rclpy.ok():
             rclpy.init(args=None)
         self.node = Node(self.node_name)
+        # 500 Hz 热路径：消息对象和 MotorCmd 类只创建一次，之后原地改字段。
+        # （旧实现每个电机都 self._RosLowCmd() 构造一条 20 电机消息 = 21 条/拍，
+        #   实测 _to_ros_cmd 0.72 ms，2 ms 预算被吃掉 1/3。）
+        self._RosMotorCmd = self._RosLowCmd().motor_cmd[0].__class__
+        self._ros_cmd_msg = self._RosLowCmd()
+        self._ros_state_msg = self._RosLowState()
         if self.role == "sim":
             self.pub = self.node.create_publisher(RosLowState, self.state_topic, 10)
             self.sub = self.node.create_subscription(RosLowCmd, self.cmd_topic, self._on_cmd, 10)
@@ -78,10 +97,22 @@ class Ros2Transport(Transport):
             self.pub = self.node.create_publisher(RosLowCmd, self.cmd_topic, 10)
             self.sub = self.node.create_subscription(RosLowState, self.state_topic, self._on_state, 10)
 
+    def create_publisher(self, msg_type, topic: str, qos=10):
+        """在同一个 rclpy node 上挂发布者（例如 /go2/controller/debug）。"""
+        return self.node.create_publisher(msg_type, topic, qos)
+
+    def create_subscription(self, msg_type, topic: str, callback, qos=10):
+        """在同一个 rclpy node 上挂额外订阅（例如 /perception/height_scan）。
+
+        控制器主循环调 recv_state() 时会 spin_once，所以这里挂的回调会被正常处理，
+        不需要再起一个 executor。
+        """
+        return self.node.create_subscription(msg_type, topic, callback, qos)
+
     def _on_state(self, m) -> None:
         st = LowState()
         st.tick = int(getattr(m, "tick", 0))
-        st.sim_time = float(st.tick) * 0.002
+        st.sim_time = float(st.tick) * self.tick_dt
         st.mode_machine = int(getattr(m, "mode_machine", 0))
         imu = m.imu_state
         st.imu_state = IMUState(
@@ -98,6 +129,7 @@ class Ros2Transport(Transport):
                 temperature=_scalar(getattr(src, "temperature", 0)), lost=_scalar(getattr(src, "lost", 0)),
             )
         st.foot_force = [int(x) for x in getattr(m, "foot_force", [0, 0, 0, 0])]
+        st.bit_flag = int(getattr(m, "bit_flag", 0)) & 0xFF
         self._latest = st
         self._n_state_rx += 1
 
@@ -105,6 +137,14 @@ class Ros2Transport(Transport):
         cmd = LowCmd()
         cmd.mode_pr = int(getattr(m, "mode_pr", 0))
         cmd.mode_machine = int(getattr(m, "mode_machine", 0))
+        if hasattr(m, "head"):
+            cmd.head = [_scalar(m.head[0]), _scalar(m.head[1])]
+        if hasattr(m, "level_flag"):
+            cmd.level_flag = _scalar(m.level_flag)
+        if hasattr(m, "frame_reserve"):
+            cmd.frame_reserve = _scalar(m.frame_reserve)
+        if hasattr(m, "gpio"):
+            cmd.gpio = _scalar(m.gpio)
         for i in range(NUM_MOTOR):
             src = m.motor_cmd[i]
             cmd.motor_cmd[i] = MotorCmd(
@@ -112,39 +152,66 @@ class Ros2Transport(Transport):
                 tau=float(src.tau), kp=float(src.kp), kd=float(src.kd),
                 reserve=_scalar(getattr(src, "reserve", 0)),
             )
+        # 真机固件会校验 CRC；仿真侧也校验一遍，让这条路径在 sim2real 之前就被测到。
+        msg_crc = _scalar(getattr(m, "crc", 0)) & 0xFFFFFFFF
+        cmd.crc = msg_crc
+        if self.crc_check:
+            if not msg_crc or msg_crc != lowcmd_crc(cmd):
+                # 真机固件对错 CRC 大概率静默丢帧；仿真侧照同样语义丢弃，
+                # 这样 CRC 回归在 sim_ros 闭环里就能暴露，而不是只记一个计数。
+                self._n_bad_crc += 1
+                self._n_cmd_rx += 1
+                return
         self._latest_cmd = cmd
         self._n_cmd_rx += 1
 
+    def _cmd_crc(self, cmd: LowCmd) -> int:
+        """500 Hz 零阶保持时大多数拍指令没变，缓存 CRC，避免每拍都算 202 个字。"""
+        key = (int(cmd.level_flag), int(cmd.head[0]), int(cmd.head[1]),
+               int(getattr(cmd, "frame_reserve", 0)), int(cmd.gpio),
+               tuple((int(c.mode), c.q, c.dq, c.tau, c.kp, c.kd, int(c.reserve))
+                     for c in cmd.motor_cmd))
+        if key != self._crc_key:
+            self._crc_key = key
+            self._crc_val = lowcmd_crc(cmd)
+        return self._crc_val
+
     def _to_ros_cmd(self, cmd: LowCmd):
-        m = self._RosLowCmd()
+        m = self._ros_cmd_msg           # 复用同一个消息对象（publish 同步序列化，安全）
         # unitree_go/msg/LowCmd 里没有 mode_pr / mode_machine（那是 unitree_hg 才有的），
         # 所以要 hasattr 兜一下，别把后端写死成某一种 IDL。
         if hasattr(m, "mode_pr"):
             m.mode_pr = cmd.mode_pr
         if hasattr(m, "mode_machine"):
             m.mode_machine = cmd.mode_machine
-        m.motor_cmd = [self._ros_motor_cmd(c) for c in cmd.motor_cmd]
+        # 真机下发的 LowCmd 必须带官方固定头，否则固件不认。
+        m.head[0] = int(cmd.head[0]) & 0xFF
+        m.head[1] = int(cmd.head[1]) & 0xFF
+        m.level_flag = int(cmd.level_flag) & 0xFF
+        m.frame_reserve = int(getattr(cmd, "frame_reserve", 0)) & 0xFF
+        m.gpio = int(cmd.gpio) & 0xFF
+        for i in range(NUM_MOTOR):
+            c, mc = cmd.motor_cmd[i], m.motor_cmd[i]
+            mc.mode = int(c.mode)
+            mc.q, mc.dq, mc.tau = c.q, c.dq, c.tau
+            mc.kp, mc.kd = c.kp, c.kd
+            res = mc.reserve                   # uint32[3]
+            res[0], res[1], res[2] = int(c.reserve), 0, 0
+        # 机器人固件校验 CRC；sim_ros profile 的 crc_check=true，这条路径在仿真里同样被验证。
+        m.crc = int(self._cmd_crc(cmd)) if self.crc_check else 0
         return m
 
-    def _ros_motor_cmd(self, c):
-        MotorCmdMsg = self._RosLowCmd().motor_cmd[0].__class__
-        mc = MotorCmdMsg()
-        mc.mode, mc.q, mc.dq = c.mode, c.q, c.dq
-        mc.tau, mc.kp, mc.kd = c.tau, c.kp, c.kd
-        if hasattr(mc, "reserve"):
-            try:
-                mc.reserve = [c.reserve, 0, 0]      # uint32[3]
-            except (TypeError, ValueError):
-                pass
-        return mc
-
     def _to_ros_state(self, st: LowState):
-        m = self._RosLowState()
+        m = self._ros_state_msg       # 复用消息对象（500 Hz 热路径，避免每拍分配）
         m.tick = int(st.tick)
-        m.imu_state.quaternion = [float(x) for x in st.imu_state.quaternion]
-        m.imu_state.gyroscope = [float(x) for x in st.imu_state.gyroscope]
-        m.imu_state.accelerometer = [float(x) for x in st.imu_state.accelerometer]
-        m.imu_state.rpy = [float(x) for x in st.imu_state.rpy]
+        imu = m.imu_state
+        for k in range(4):
+            imu.quaternion[k] = float(st.imu_state.quaternion[k])
+        for arr_dst, arr_src in ((imu.gyroscope, st.imu_state.gyroscope),
+                                 (imu.accelerometer, st.imu_state.accelerometer),
+                                 (imu.rpy, st.imu_state.rpy)):
+            for k in range(3):
+                arr_dst[k] = float(arr_src[k])
         for i in range(NUM_MOTOR):
             src, dst = st.motor_state[i], m.motor_state[i]
             dst.mode, dst.q, dst.dq = src.mode, src.q, src.dq
@@ -153,7 +220,8 @@ class Ros2Transport(Transport):
                 dst.temperature = src.temperature
             if hasattr(dst, "lost"):
                 dst.lost = src.lost
-        m.foot_force = [int(x) for x in st.foot_force]
+        for k in range(4):
+            m.foot_force[k] = int(st.foot_force[k])
         return m
 
     def publish_state(self, state: LowState) -> None:
@@ -207,4 +275,5 @@ class Ros2Transport(Transport):
         return {"transport": self.name, "domain_id": self.domain_id,
                 "cmd_topic": self.cmd_topic, "state_topic": self.state_topic,
                 "rx_cmd": self._n_cmd_rx, "rx_state": self._n_state_rx,
+                "bad_crc": self._n_bad_crc,
                 "drained_extra": self._n_drained, "drained_extra_max": self._max_drain}

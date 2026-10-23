@@ -1,1046 +1,1077 @@
 {
- "robot": "go2",
- "robots": {
-  "go2": {
-   "model_dir": "sim_env/models/go2",
-   "scene": "scene.xml",
-   "scene_flat": "sim_env/models/go2/scene_flat.xml",
-   "_linvel_frame_note": "观测 0:3 的线速度坐标系. go2_walk.py 用 command_config.frame='body' -> 策略期待**机体系**速度 (R^T @ v_world). go2_walk 是 world. 喂错在小偏航时几乎看不出, 一转向就退化.",
-   "linvel_frame": "body",
-   "_stand_pose_note": "标称站姿改用 unitree_rl_gym / 官方部署惯例, 不再用 go2.xml 的 keyframe. 顺序固定 = MOTOR_JOINTS = FR,FL,RR,RL x (hip,thigh,calf). 实测: 官方 keyframe (0,0.9,-1.8) 在 kp=20/kd=1 下站不住 (CPU MuJoCo 3s 内 z 掉到 0.19m / 倾角 8-18 并继续下沉); 本姿态 z≈0.236m / 倾角 1-3 稳定. 证据见 docs/go2-deploy-readiness.md §2",
-   "stand_pose": [
-    -0.1,
-    0.8,
-    -1.5,
-    0.1,
-    0.8,
-    -1.5,
-    -0.1,
-    1.0,
-    -1.5,
-    0.1,
-    1.0,
-    -1.5
-   ],
-   "_stand_height_note": "出生高度 = go2_walk.spawn_z_offset / eval_go2 --spawn-z / 训练 keyframe 的 z, 三者一致 = 0.32",
-   "stand_height": 0.32,
-   "_foot_soft_contact_note": "**v2 交付策略是硬接触训出来的, 所以这里必须是 false** —— 即用部署模型 go2.xml 自带的足端参数 (condim=6, MuJoCo 默认 solimp 0.9/0.95/0.001/0.5/2.0). 训练模型 models/go2/go2_mjx_position.xml 的足端已改成与部署模型逐项一致 (condim=6 / 同 solimp / margin=0), 所以 false 才是'评测物理 == 训练物理'. (v1 软接触那版才需要 true; 那一版已作废, 见 docs/go2-hard-contact-rationale.md)",
-   "foot_soft_contact": false,
-   "_solver_note": "训练真实求解器是 MJX warp 的 2/5 次迭代, CPU Newton 无法复刻该语义 (2 次迭代在 CPU 下严重欠解). 因此 CPU 评测统一用收敛的 100/50 (MuJoCo 默认), 即 eval_go2.py 的 --solver cpu 档; 实测 100/50 + 软接触能复现训练模型的静态站姿 (z≈0.265-0.267m).",
-   "solver_iterations": 100,
-   "solver_ls_iterations": 50,
-   "_scan_base_note": "训练侧 go2_walk.py 的 height_scan.base = 0 => 特征 = clip(z_base - h_ground - base, ±0.35)*5. Go2 的 base = 0.268 (= Go2 在训练模型上沉降后的 qpos[2]); 0.28 是 Go2 的值. 写错会让 35 维扫描整体偏置 (0.28->0.268 差 0.012*5 = 0.06).",
-   "scan_base": 0.268,
-   "_home_q_note": "obs 的 12:24 段 = qpos[7:] - home, home 必须逐位等于**训练模型 keyframe 的 ctrl** (go2_mjx_position.xml: z=0.32, qpos[7:] 与 ctrl 相同). 顺序 FR,FL,RR,RL x (hip,thigh,calf). Go2 是 hip=0, Go2 是 hip=±0.1.",
-   "home_q": [
-    -0.1,
-    0.8,
-    -1.5,
-    0.1,
-    0.8,
-    -1.5,
-    -0.1,
-    1.0,
-    -1.5,
-    0.1,
-    1.0,
-    -1.5
-   ]
+  "robot": "go2",
+  "robots": {
+    "go2": {
+      "model_dir": "sim_env/models/go2",
+      "scene": "scene.xml",
+      "scene_flat": "sim_env/models/go2/scene_flat.xml",
+      "_linvel_frame_note": "观测 0:3 的线速度坐标系. go2_walk.py 用 command_config.frame='body' -> 策略期待**机体系**速度 (R^T @ v_world). go2_walk 是 world. 喂错在小偏航时几乎看不出, 一转向就退化.",
+      "linvel_frame": "body",
+      "_stand_pose_note": "标称站姿改用 unitree_rl_gym / 官方部署惯例, 不再用 go2.xml 的 keyframe. 顺序固定 = MOTOR_JOINTS = FR,FL,RR,RL x (hip,thigh,calf). 实测: 官方 keyframe (0,0.9,-1.8) 在 kp=20/kd=1 下站不住 (CPU MuJoCo 3s 内 z 掉到 0.19m / 倾角 8-18 并继续下沉); 本姿态 z≈0.236m / 倾角 1-3 稳定. 证据见 real_env/README.md §6",
+      "stand_pose": [
+        -0.1,
+        0.8,
+        -1.5,
+        0.1,
+        0.8,
+        -1.5,
+        -0.1,
+        1.0,
+        -1.5,
+        0.1,
+        1.0,
+        -1.5
+      ],
+      "_stand_height_note": "出生高度 = go2_walk.spawn_z_offset / eval_go2 --spawn-z / 训练 keyframe 的 z, 三者一致 = 0.32",
+      "stand_height": 0.32,
+      "_foot_soft_contact_note": "**v2 交付策略是硬接触训出来的, 所以这里必须是 false** —— 即用部署模型 go2.xml 自带的足端参数 (condim=6, MuJoCo 默认 solimp 0.9/0.95/0.001/0.5/2.0). 训练模型 models/go2/go2_mjx_position.xml 的足端已改成与部署模型逐项一致 (condim=6 / 同 solimp / margin=0), 所以 false 才是'评测物理 == 训练物理'. (v1 软接触那版才需要 true; 那一版已作废, 见 docs/go2-train-deploy-parity.md §4)",
+      "foot_soft_contact": false,
+      "_solver_note": "训练真实求解器是 MJX warp 的 2/5 次迭代, CPU Newton 无法复刻该语义 (2 次迭代在 CPU 下严重欠解). 因此 CPU 评测统一用收敛的 100/50 (MuJoCo 默认), 即 eval_go2.py 的 --solver cpu 档; 实测 100/50 + 当前足端参数能复现训练模型的静态站姿 (z≈0.265-0.267m).",
+      "solver_iterations": 100,
+      "solver_ls_iterations": 50,
+      "_scan_base_note": "训练侧 go2_walk.py 的 height_scan.base = 0 => 特征 = clip(z_base - h_ground - base, ±0.35)*5. Go2 的 base = 0.268 (= Go2 在训练模型上沉降后的 qpos[2]); 0.28 是 Go2 的值. 写错会让 35 维扫描整体偏置 (0.28->0.268 差 0.012*5 = 0.06).",
+      "scan_base": 0.268,
+      "_home_q_note": "obs 的 12:24 段 = qpos[7:] - home, home 必须逐位等于**训练模型 keyframe 的 ctrl** (go2_mjx_position.xml: z=0.32, qpos[7:] 与 ctrl 相同). 顺序 FR,FL,RR,RL x (hip,thigh,calf). Go2 是 hip=0, Go2 是 hip=±0.1.",
+      "home_q": [
+        -0.1,
+        0.8,
+        -1.5,
+        0.1,
+        0.8,
+        -1.5,
+        -0.1,
+        1.0,
+        -1.5,
+        0.1,
+        1.0,
+        -1.5
+      ]
+    }
+  },
+  "sim_dt": 0.002,
+  "control_dt": 0.02,
+  "ramp_rate": 200,
+  "hold_until_first_cmd": true,
+  "target": "sim_udp",
+  "io_profiles": {
+    "sim_udp": {
+      "name": "udp",
+      "host": "127.0.0.1",
+      "cmd_port": 50001,
+      "state_port": 50002,
+      "crc_check": true,
+      "watchdog_ms": 60
+    },
+    "sim_ros": {
+      "name": "ros2",
+      "domain_id": 1,
+      "interface": "lo",
+      "crc_check": true,
+      "watchdog_ms": 60,
+      "cmd_topic": "/lowcmd",
+      "state_topic": "/lowstate",
+      "tick_dt": 0.002
+    },
+    "sim_sdk": {
+      "name": "dds",
+      "domain_id": 1,
+      "interface": "lo",
+      "crc_check": false,
+      "watchdog_ms": 60,
+      "cmd_topic": "rt/lowcmd",
+      "state_topic": "rt/lowstate",
+      "tick_dt": 0.002
+    },
+    "real_ros": {
+      "name": "ros2",
+      "domain_id": 0,
+      "interface": "eth0",
+      "crc_check": true,
+      "watchdog_ms": 60,
+      "cmd_topic": "/lowcmd",
+      "state_topic": "/lowstate",
+      "tick_dt": 0.001
+    },
+    "real_sdk": {
+      "name": "dds",
+      "domain_id": 0,
+      "interface": "eth0",
+      "crc_check": true,
+      "watchdog_ms": 60,
+      "cmd_topic": "rt/lowcmd",
+      "state_topic": "rt/lowstate",
+      "tick_dt": 0.001
+    }
+  },
+  "controller": {
+    "type": "stand",
+    "kp": 60,
+    "kd": 5,
+    "ramp_s": 1
+  },
+  "policy": {
+    "_note": "默认策略块; 实际策略由 policy_profile=auto 选中 policy_profiles.go2 (或 --policy-profile 指定档)",
+    "npz": "ros2_controller/policies/go2_walk_v25b.npz",
+    "train_robot": "go2",
+    "kp": 20,
+    "kd": 1,
+    "command": [
+      0.5,
+      0,
+      0
+    ],
+    "velocity_source": "estimator",
+    "height_scan_source": "raycast",
+    "action_clip_to_train_joint_range": true,
+    "ramp_s": 0,
+    "start_delay_s": 0,
+    "contact_force_thresh": 30,
+    "prepose_s": 1.5,
+    "prepose_kp": 20,
+    "prepose_kd": 1,
+    "clearance_hz": 3,
+    "scan": {
+      "nx": 17,
+      "ny": 11,
+      "x": [
+        -0.4,
+        1.2
+      ],
+      "y": [
+        -0.5,
+        0.5
+      ]
+    }
+  },
+  "_policy_profile_note": "policy_profile=auto 时按当前 robot 选档 (go2 -> policy_profiles.go2); 2026-10-21 v29 起 go2 指向 v29c; 可用 --policy-profile go2_v25b 等指定档 (回退)",
+  "policy_profile": "auto",
+  "policy_profiles": {
+    "go2": {
+      "npz": "ros2_controller/policies/go2_walk_v33d.npz",
+      "_npz_note": "[自动档, 2026-10-21 v33 交付] policy_profile=auto -> go2 -> v33d。v33d = 混合地形课程 mixed1 + 70/30 混合命令 + 20M 步 4 段 lr 阶梯衰减 (4e-5->2e-5->1e-5->5e-6)。台阶: 0.03m 上1级100%/上2级98%; 0.05m 上1级100%/上2级83%/存活95%; 0.08m 上1级34%(会摔, Go2 上限~0.10m)。warp 6s: hyb2 94.5 (v29c 93.2), stg1 82.0 (83.9), bg200 87.8 (85.4), rubble 96.9 (96.1), wide_h050 97.1 (81.5); CPU 48seed: 总存活 86.7% (v29c 87.5, 噪声内), 速度 0.323 (0.291), 位移 4.23m (3.72), 髋 q p95 44.4/29.7/26.2/40.8 (43.5/40.8/37.8/41.4); hyb2 81.2 (v29c 91.7), big1 79.2 (87.5) 略低, stg1/rubble 更好。回退: go2_v29c (上一交付, 最稳 hyb2) / go2_v32b (台阶专精前身) / go2_v25b",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v3": {
+      "npz": "ros2_controller/policies/go2_walk_v3.npz",
+      "_npz_note": "v3 (40M 步): 速度观测 = 真值 + bias(±0.12) + OU 慢漂(0.08/2s) + 0~2 步延迟 + 0.15 白噪声; 其余与 v2 相同",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "leg_fk",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
+      "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，所有采样点填的是同一个值；训练侧是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-sim-fidelity.md 与 real_env/README.md §6。"
+    },
+    "go2_v4": {
+      "npz": "ros2_controller/policies/go2_walk_v4.npz",
+      "_npz_note": "v4 (40.55M 步): v2 配方 + 混合地形 (n=128, 3x3 patch: 台阶/斜坡/起伏/波/方块/Perlin). 单变量 = 地形.",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "leg_fk",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
+      "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，所有采样点填的是同一个值；训练侧是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-sim-fidelity.md 与 real_env/README.md §6。"
+    },
+    "go2_v2": {
+      "npz": "ros2_controller/policies/go2_walk_policy.npz",
+      "_npz_note": "v2 回滚档: 旧地形 37.26M 硬接触 (go2_walk_policy_hard.pkl)",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "leg_fk",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
+      "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，所有采样点填的是同一个值；训练侧是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-sim-fidelity.md 与 real_env/README.md §6。"
+    },
+    "go2_v6": {
+      "npz": "ros2_controller/policies/go2_walk_v6.npz",
+      "_npz_note": "v6 (遮挡感知训练): 187 点扫描 (17x11), 真机 L1 几何遮挡 + 高程图记忆/丢点/扇区缺失。obs 243 维; 需 --scan raycast (或 eval 侧 oracle 扫描) 才能发挥地形能力",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
+      "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，所有采样点填的是同一个值；训练侧是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-sim-fidelity.md 与 real_env/README.md §6。",
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v25a6": {
+      "npz": "ros2_controller/policies/go2_walk_v25a6.npz",
+      "_npz_note": "[实验档] v25a@6.06M (big1 速度观测随机化的后期检查点): 512 env 竖面 80.5 / hfield 79.9 / 碎石 82.4; 部署闭环待验。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v27": {
+      "npz": "ros2_controller/policies/go2_walk_v27.npz",
+      "_npz_note": "[实验档] v27 = v26 -> 平地 1M (去偏置, 速度观测随机化)。验证能否修复部署绕圈。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v26": {
+      "npz": "ros2_controller/policies/go2_walk_v26.npz",
+      "_npz_note": "[实验档] v26 = v25a@3.03M -> hyb2 巩固 2M (lr 2e-5, 速度观测随机化)。用于验证能否在保住 v25a 仿真能力的同时修复部署闭环。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v25a": {
+      "npz": "ros2_controller/policies/go2_walk_v25a.npz",
+      "_npz_note": "v25a (1024-512, 训练链 v20 -> v24 -> big1 6M 的 3.03M 检查点, 速度观测噪声/偏置/漂移/延迟随机化): 512 env vs v20: 真竖面 82.4 vs 80.0 (方块 76.6, 楼梯 76.8, 混合 90.0/86.3), hfield 80.1 vs 79.0, **碎石 83.8 vs 73.8 (+10)**。部署 CPU 闭环 oracle/estimator 双源均稳定。回滚: go2_v20 / go2_v24 / go2_v17 / go2_v13 / go2_v6",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v25b": {
+      "npz": "ros2_controller/policies/go2_walk_v25b.npz",
+      "_npz_note": "v25b (1024-512, 训练链: v20 -> v24 -> big1 6M (速度观测噪声/偏置/漂移/延迟随机化) -> hyb2 巩固 2M): 512 env vs v20: 真竖面 80.0 (平), hfield 78.9 (平), **碎石 80.7 vs 73.8 (+6.9)**; 平地 CPU 100% (vx 0.488, 滑移 0.279 最好, trot 71%); **部署 CPU 闭环 oracle(12.6m/20s) 与 estimator(7.8m/20s) 双源都稳定 upright**。回滚: go2_v20 / go2_v24 / go2_v17 / go2_v13 / go2_v6",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v24": {
+      "npz": "ros2_controller/policies/go2_walk_v24.npz",
+      "_npz_note": "[实验档, 未作默认] v24 (大混合地形课程: v20 -> big1 15M 的 6.06M -> hyb2 巩固 3M): 仿真 512 env 同进程 vs v20: 真竖面 81.0 vs 79.7, hfield 79.1 vs 78.8, 碎石 77.1 vs 71.7 (+5.4); 平地 CPU 100% (vx 0.46, 滑移 0.29 最好)。**但在 CPU 部署闭环里对速度观测源敏感**: --linvel oracle 会绕圈 (x0.5,y-1.3), estimator 正常 (x6.9)。晋升默认前需更多验证。回滚: go2_v20",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v20": {
+      "npz": "ros2_controller/policies/go2_walk_v20.npz",
+      "_npz_note": "v20 (1024-512 宽网络, 20M 训练链的 11.47M 检查点): 用'精确等价扩展'热启动自 v17。512 env 同进程 vs v17: 真竖面均值 79.8 vs 76.2 (+3.6: 方块 70.9/楼梯 77.7/混合 86.1/84.6), hfield 均值 78.3 vs 76.8 (+1.5), 无回退地形。回滚: --policy-profile go2_v17 / go2_v13 / go2_v6",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v17pad": {
+      "npz": "ros2_controller/policies/go2_walk_v17pad.npz",
+      "_npz_note": "调试档: v17 权重 + 112 维零历史输入 (用于验证部署侧历史链路; 策略不依赖历史)",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v18h": {
+      "npz": "ros2_controller/policies/go2_walk_v18h.npz",
+      "_npz_note": "[实验档, 勿作默认] v18h (512-256 + 3 帧观测历史, 20.1M): 热启动自 v17, history=3 -> obs 355。**仿真 (warp) 显著优于 v17**: 512 env 同进程 真竖面 78.1 vs 74.6, hfield 78.5 vs 76.5, 方块竖面 73.6 vs 66.2。**但部署侧 (CPU MuJoCo + kp20) 平地闭环会倒** (10s 内 tilt 45°, 后退) —— 历史帧让策略对 sim2sim 动力学差异更敏感; 部署默认仍 v17。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v17": {
+      "npz": "ros2_controller/policies/go2_walk_v17.npz",
+      "_npz_note": "v17 (512-256 大网络, 20M 训练链的 8.6M 检查点): 用'精确等价扩展'热启动自 v13。真竖面 384env 6s 存活均值 76.2% (方块 66.4 / 楼梯 73.7 / 混合 82.8), hfield 均值 78.0%, 平地 CPU 100% (trot 53%, 滑移 0.393)。回滚: --policy-profile go2_v13 / go2_v6",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v13": {
+      "npz": "ros2_controller/policies/go2_walk_v13.npz",
+      "_npz_note": "v13 (竖面几何训练, 20.3M): 混合地形 hyb2 = 真竖面 box geom (boxes/stairs) + hfield (boxes/stairs/rough/slope)。真竖面 384env 6s 存活: 方块 58.6% / 楼梯 69.3% / 混合 77.9%; hfield 口径 72-82%; 平地 CPU 16x15s 100%, trot 54%, slip 0.383。回滚: --policy-profile go2_v6",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v5a": {
+      "npz": "ros2_controller/policies/go2_walk_v5a.npz",
+      "_npz_note": "v5a (20.07M, 187 点扫描 + mix 地形; v6 的起点) —— 部署对照用",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
+      "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，所有采样点填的是同一个值；训练侧是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-sim-fidelity.md 与 real_env/README.md §6。",
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v28a1b": {
+      "npz": "ros2_controller/policies/go2_walk_v28a1b.npz",
+      "_npz_note": "[实验档, 不推荐默认] v28a1b: v25b + 髋动作/状态惩罚微调 4M。髋摆幅 -7% (hip_q 30.96->28.88 度), 但 warp 地形 -1~-4pp; 台阶无改善。保留用于对比。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v28c": {
+      "npz": "ros2_controller/policies/go2_walk_v28c.npz",
+      "_npz_note": "[实验档, 不推荐默认] v28c: v28a1b -> hyb2 巩固 2.5M。髋摆幅 -9% (warp 31.1->28.2 度; CPU 平地 hip_q p95 47.1/45.3/43.3/45.6 -> 44.2/43.5/40.9/42.5), flat 100%, 但 warp/stg1 -2~3pp、bg200 -6pp、台阶地形 -13~16pp -> 鲁棒性代价。台阶仍未学会 (bands2 climb 0.016m)。默认保持 go2_v25b。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v29c": {
+      "npz": "ros2_controller/policies/go2_walk_v29c.npz",
+      "_npz_note": "[v29 台阶专项, 待验收] 训练链: v25b -> 宽楼梯 0.02 (3M) -> 0.03+feet_clearance (2M) -> 0.05 (3M) -> 混合难度赛道 lanes1 0.03/0.05/0.08/0.11 (4.2M) -> hyb2 巩固 (3M)。训练侧新增 full_reset=True、progress/lazy_stop/termination、速度加权 feet_clearance、orientation -5、action_acc、非足端深穿透终止、多难度楼梯地形。台阶: 0.03m 上1级 91%/上2级 9.6%; 0.05m 上1级 47% (v25b 29%); 0.08m 仍弱。风险: hyb2/stg1/平地指标见 v29 验收; 若不如 v25b 则保持默认 v25b。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v31d": {
+      "npz": "ros2_controller/policies/go2_walk_v31d.npz",
+      "_npz_note": "[v31d 大网络+hyb2 巩固, 实验] v31c 再 2M hyb2 巩固。台阶 0.03m 上1级98%/上2级70%, 0.05m 上1级81%/上2级44%; 部署 CPU 24seed 总存活 80.8% (v29c 89.2), warp 存活比 v29c 低 2-32pp 但速度/髋更好。默认仍 v29c, 本档作为台阶激进取向对照。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v31e": {
+      "npz": "ros2_controller/policies/go2_walk_v31e.npz",
+      "_npz_note": "[v31e 二轮巩固, 不建议默认] v31d 再 3M hyb2 (lr2e-5, lazy-2/term-30)。部署 CPU 24seed 78.3%, 台阶也回落到 0.03m 上2级33%/0.05m 上1级39% —— 过度巩固会丢台阶能力, 仅留作证据。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v31c": {
+      "npz": "ros2_controller/policies/go2_walk_v31c.npz",
+      "_npz_note": "[v31c 台阶专精档, 实验] 1536-768 (net2wider), per-env 地形课程 (lanes2 riser 0.02-0.14) 6M + 更难课程 4M; 无 hyb2 巩固。台阶最强: 0.03m 上1级100%/上2级86%; 0.05m 上1级96%/上2级63%; 0.08m 上1级22%; 但部署地形 (hyb2/stg1/bg200 等) 存活率比 v29c 低, 只建议台阶专项/离线评估用。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v32": {
+      "npz": "ros2_controller/policies/go2_walk_v32.npz",
+      "_npz_note": "[v32 混合地形课程, 候选] 1536-768; 地形 mixed1 = 5 条隔离混合赛道 (台阶 riser 0.02/0.04/0.06/0.08/0.10 + 离散箱体区 + 碎石区), per-env 课程 (init_max2, success 3.5m, min 1.2m) 训练 6.2M。目标: 同时保留台阶攀爬与部署稳健性。验收数值见 docs/go2-sim-fidelity.md §5.8; 默认档仍看验收结果决定。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v32b": {
+      "npz": "ros2_controller/policies/go2_walk_v32b.npz",
+      "_npz_note": "[v32b 混合课程+短巩固, 候选] v32 (混合地形课程 6.2M, 台阶 0.03m 上2级95%/0.05m 74%) 再 0.8M hyb2 短巩固 (lr 1e-5, 全命令分布 vx0-1/vy±0.4/wz±1.5, RING 出生)。目标: 补回转向/全命令鲁棒性同时保留台阶收益。验收数值见 docs/go2-sim-fidelity.md §5.8。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    },
+    "go2_v33d": {
+      "npz": "ros2_controller/policies/go2_walk_v33d.npz",
+      "_npz_note": "[v33d 20M 长训练冠军, 候选默认] 混合地形课程 mixed1 + 70/30 混合命令分布 (前向偏置 70%, 全命令 30%) + 20M 步 4 段 lr 阶梯衰减 (4e-5->2e-5->1e-5->5e-6)。四段 eval_reward 466.9->570.2->620.5->750.4 单调上升, ep_len 612; 证明课程+命令混合+lr 衰减下延长训练有效。验收数值见 docs/go2-sim-fidelity.md §5.8。",
+      "train_robot": "go2",
+      "kp": 20,
+      "kd": 1,
+      "command": [
+        0.5,
+        0,
+        0
+      ],
+      "velocity_source": "estimator",
+      "height_scan_source": "raycast",
+      "action_clip_to_train_joint_range": true,
+      "ramp_s": 0,
+      "start_delay_s": 0,
+      "contact_force_thresh": 30,
+      "prepose_s": 1.5,
+      "prepose_kp": 20,
+      "prepose_kd": 1,
+      "clearance_hz": 3,
+      "scan": {
+        "nx": 17,
+        "ny": 11,
+        "x": [
+          -0.4,
+          1.2
+        ],
+        "y": [
+          -0.5,
+          0.5
+        ]
+      }
+    }
+  },
+  "safety": {
+    "mode_kp": 20,
+    "mode_kd": 1,
+    "crouch_depth": 0.35,
+    "crouch_s": 2,
+    "l2_policy": "crouch_then_damp"
+  },
+  "health": {
+    "estop_ms": 200,
+    "protect_ms": 60,
+    "stale_ms": 20,
+    "recover_s": 1,
+    "max_tilt_deg": 60,
+    "sigma_max": 0.5,
+    "sigma_warn": 0.2,
+    "optional_channels": [
+      "cmd_vel",
+      "height_scan"
+    ],
+    "confidence_channel": "linvel_conf",
+    "confidence_min": 0.3
+  },
+  "perception": {
+    "_note": "v6: 真机 Unitree L1 口径。mount_body = unitree_ros URDF radar_joint (机头前缘, 略低于躯干中心); vfov = 360x90 FOV 装配下俯 15° -> 相对水平 -60..+30°; self_occlusion = 射线打到机器人自身 geom 判为遮挡 (不再把机体从 raycast 排除); fill_local = 未观测格点填局部地面 (特征≈0), 与训练 v6 遮挡模型 fill 语义一致。 真机 L1: 点云 frame=utlidar_lidar，需 --points-frame lidar + 外参 R/t（mount_body/mount_rpy_body）。",
+    "enable": false,
+    "_perf_note": "n_rays x rate_hz 决定 raycast 成本: 3000@50Hz 用逐条 mj_ray 实测 28ms/帧, 直接把 RTF 压到 0.39。默认改为 900@15Hz + mj_multiRay 批量投射 (~5.2ms/帧 x 15Hz = 78ms/s; 真机 L1 本身也就 10~20Hz)。要最真实的稠密点云: n_rays=3000, rate_hz=50, use_multiray=true。",
+    "n_rays": 900,
+    "rate_hz": 15.0,
+    "use_multiray": true,
+    "max_range": 6.0,
+    "height_above_ground": 0.3,
+    "mount_body": [
+      0.28945,
+      0.0,
+      -0.046825
+    ],
+    "vfov": [
+      -1.0472,
+      0.5236
+    ],
+    "min_range": 0.1,
+    "self_occlusion": true,
+    "map_resolution": 0.05,
+    "map_decay_s": 1.0,
+    "fill_local": true,
+    "seed": 0,
+    "mount_rpy_body": [
+      0.0,
+      2.8782,
+      0.0
+    ],
+    "_mount_note": "雷达外参（雷达系 -> 机体系）: p_base = R(rpy) @ p_lidar + t。来源冲突: 官方 unitree_ros go2_description.urdf 的 radar_joint = xyz(0.28945,0,-0.046825) rpy(0,2.8782,0) (前装、倒装 ~165°); 社区 go2_ros2_sdk URDF 为顶装 xyz≈(0.0018,0.0001,0.2536) rpy=0。两者矛盾，真机必须用点云实测标定（先存 /utlidar/cloud，再与仿真/Isaac 点云对齐求 R,t）；仿真 SimLidar 只用 mount_body 作射线原点（不含旋转），高度扫描网格由训练契约定义，不受此影响。"
+  },
+  "domain_gap": {
+    "profile": "sim_clean"
+  },
+  "health_profiles": {
+    "_note": "按 target 覆盖 health。真机 DDS 偶发抖动比仿真大：stale_ms 太紧(20ms)会被一次调度抖动打成 L1(下蹲)。仿真保持原值不变。",
+    "real_ros": {
+      "stale_ms": 40,
+      "protect_ms": 80,
+      "estop_ms": 250
+    },
+    "real_sdk": {
+      "stale_ms": 40,
+      "protect_ms": 80,
+      "estop_ms": 250
+    }
   }
- },
- "sim_dt": 0.002,
- "control_dt": 0.02,
- "ramp_rate": 200,
- "hold_until_first_cmd": true,
- "target": "sim_udp",
- "io_profiles": {
-  "sim_udp": {
-   "name": "udp",
-   "host": "127.0.0.1",
-   "cmd_port": 50001,
-   "state_port": 50002,
-   "crc_check": true,
-   "watchdog_ms": 60
-  },
-  "sim_ros": {
-   "name": "ros2",
-   "domain_id": 1,
-   "interface": "lo",
-   "crc_check": false,
-   "watchdog_ms": 60
-  },
-  "sim_sdk": {
-   "name": "dds",
-   "domain_id": 1,
-   "interface": "lo",
-   "crc_check": false,
-   "watchdog_ms": 60
-  },
-  "real_ros": {
-   "name": "ros2",
-   "domain_id": 0,
-   "interface": "eth0",
-   "crc_check": true,
-   "watchdog_ms": 20
-  },
-  "real_sdk": {
-   "name": "dds",
-   "domain_id": 0,
-   "interface": "eth0",
-   "crc_check": true,
-   "watchdog_ms": 20
-  }
- },
- "controller": {
-  "type": "stand",
-  "kp": 60,
-  "kd": 5,
-  "ramp_s": 1
- },
- "policy": {
-  "_note": "默认策略块; 实际策略由 policy_profile=auto 选中 policy_profiles.go2 (或 --policy-profile 指定档)",
-  "npz": "ros2_controller/policies/go2_walk_v25b.npz",
-  "train_robot": "go2",
-  "kp": 20,
-  "kd": 1,
-  "command": [
-   0.5,
-   0,
-   0
-  ],
-  "velocity_source": "estimator",
-  "height_scan_source": "raycast",
-  "action_clip_to_train_joint_range": true,
-  "ramp_s": 0,
-  "start_delay_s": 0,
-  "contact_force_thresh": 30,
-  "prepose_s": 1.5,
-  "prepose_kp": 20,
-  "prepose_kd": 1,
-  "clearance_hz": 3,
-  "scan": {
-   "nx": 17,
-   "ny": 11,
-   "x": [
-    -0.4,
-    1.2
-   ],
-   "y": [
-    -0.5,
-    0.5
-   ]
-  }
- },
- "_policy_profile_note": "policy_profile=auto 时按当前 robot 选档 (go2 -> policy_profiles.go2); 2026-10-21 v29 起 go2 指向 v29c; 可用 --policy-profile go2_v25b 等指定档 (回退)",
- "policy_profile": "auto",
- "policy_profiles": {
-  "go2": {
-   "npz": "ros2_controller/policies/go2_walk_v33d.npz",
-   "_npz_note": "[自动档, 2026-10-21 v33 交付] policy_profile=auto -> go2 -> v33d。v33d = 混合地形课程 mixed1 + 70/30 混合命令 + 20M 步 4 段 lr 阶梯衰减 (4e-5->2e-5->1e-5->5e-6)。台阶: 0.03m 上1级100%/上2级98%; 0.05m 上1级100%/上2级83%/存活95%; 0.08m 上1级34%(会摔, Go2 上限~0.10m)。warp 6s: hyb2 94.5 (v29c 93.2), stg1 82.0 (83.9), bg200 87.8 (85.4), rubble 96.9 (96.1), wide_h050 97.1 (81.5); CPU 48seed: 总存活 86.7% (v29c 87.5, 噪声内), 速度 0.323 (0.291), 位移 4.23m (3.72), 髋 q p95 44.4/29.7/26.2/40.8 (43.5/40.8/37.8/41.4); hyb2 81.2 (v29c 91.7), big1 79.2 (87.5) 略低, stg1/rubble 更好。回退: go2_v29c (上一交付, 最稳 hyb2) / go2_v32b (台阶专精前身) / go2_v25b",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v3": {
-   "npz": "ros2_controller/policies/go2_walk_v3.npz",
-   "_npz_note": "v3 (40M 步): 速度观测 = 真值 + bias(±0.12) + OU 慢漂(0.08/2s) + 0~2 步延迟 + 0.15 白噪声; 其余与 v2 相同",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "leg_fk",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
-   "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，35 个采样点填的是同一个值；训练侧的 35 维是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-deploy-readiness.md §5。"
-  },
-  "go2_v4": {
-   "npz": "ros2_controller/policies/go2_walk_v4.npz",
-   "_npz_note": "v4 (40.55M 步): v2 配方 + 混合地形 (n=128, 3x3 patch: 台阶/斜坡/起伏/波/方块/Perlin). 单变量 = 地形.",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "leg_fk",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
-   "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，35 个采样点填的是同一个值；训练侧的 35 维是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-deploy-readiness.md §5。"
-  },
-  "go2_v2": {
-   "npz": "ros2_controller/policies/go2_walk_policy.npz",
-   "_npz_note": "v2 回滚档: 旧地形 37.26M 硬接触 (go2_walk_policy_hard.pkl)",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "leg_fk",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
-   "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，35 个采样点填的是同一个值；训练侧的 35 维是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-deploy-readiness.md §5。"
-  },
-  "go2_v6": {
-   "npz": "ros2_controller/policies/go2_walk_v6.npz",
-   "_npz_note": "v6 (遮挡感知训练): 187 点扫描 (17x11), 真机 L1 几何遮挡 + 高程图记忆/丢点/扇区缺失。obs 243 维; 需 --scan raycast (或 eval 侧 oracle 扫描) 才能发挥地形能力",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
-   "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，35 个采样点填的是同一个值；训练侧的 35 维是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-deploy-readiness.md §5。",
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v25a6": {
-   "npz": "ros2_controller/policies/go2_walk_v25a6.npz",
-   "_npz_note": "[实验档] v25a@6.06M (big1 速度观测随机化的后期检查点): 512 env 竖面 80.5 / hfield 79.9 / 碎石 82.4; 部署闭环待验。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v27": {
-   "npz": "ros2_controller/policies/go2_walk_v27.npz",
-   "_npz_note": "[实验档] v27 = v26 -> 平地 1M (去偏置, 速度观测随机化)。验证能否修复部署绕圈。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v26": {
-   "npz": "ros2_controller/policies/go2_walk_v26.npz",
-   "_npz_note": "[实验档] v26 = v25a@3.03M -> hyb2 巩固 2M (lr 2e-5, 速度观测随机化)。用于验证能否在保住 v25a 仿真能力的同时修复部署闭环。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v25a": {
-   "npz": "ros2_controller/policies/go2_walk_v25a.npz",
-   "_npz_note": "v25a (1024-512, 训练链 v20 -> v24 -> big1 6M 的 3.03M 检查点, 速度观测噪声/偏置/漂移/延迟随机化): 512 env vs v20: 真竖面 82.4 vs 80.0 (方块 76.6, 楼梯 76.8, 混合 90.0/86.3), hfield 80.1 vs 79.0, **碎石 83.8 vs 73.8 (+10)**。部署 CPU 闭环 oracle/estimator 双源均稳定。回滚: go2_v20 / go2_v24 / go2_v17 / go2_v13 / go2_v6",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v25b": {
-   "npz": "ros2_controller/policies/go2_walk_v25b.npz",
-   "_npz_note": "v25b (1024-512, 训练链: v20 -> v24 -> big1 6M (速度观测噪声/偏置/漂移/延迟随机化) -> hyb2 巩固 2M): 512 env vs v20: 真竖面 80.0 (平), hfield 78.9 (平), **碎石 80.7 vs 73.8 (+6.9)**; 平地 CPU 100% (vx 0.488, 滑移 0.279 最好, trot 71%); **部署 CPU 闭环 oracle(12.6m/20s) 与 estimator(7.8m/20s) 双源都稳定 upright**。回滚: go2_v20 / go2_v24 / go2_v17 / go2_v13 / go2_v6",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v24": {
-   "npz": "ros2_controller/policies/go2_walk_v24.npz",
-   "_npz_note": "[实验档, 未作默认] v24 (大混合地形课程: v20 -> big1 15M 的 6.06M -> hyb2 巩固 3M): 仿真 512 env 同进程 vs v20: 真竖面 81.0 vs 79.7, hfield 79.1 vs 78.8, 碎石 77.1 vs 71.7 (+5.4); 平地 CPU 100% (vx 0.46, 滑移 0.29 最好)。**但在 CPU 部署闭环里对速度观测源敏感**: --linvel oracle 会绕圈 (x0.5,y-1.3), estimator 正常 (x6.9)。晋升默认前需更多验证。回滚: go2_v20",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v20": {
-   "npz": "ros2_controller/policies/go2_walk_v20.npz",
-   "_npz_note": "v20 (1024-512 宽网络, 20M 训练链的 11.47M 检查点): 用'精确等价扩展'热启动自 v17。512 env 同进程 vs v17: 真竖面均值 79.8 vs 76.2 (+3.6: 方块 70.9/楼梯 77.7/混合 86.1/84.6), hfield 均值 78.3 vs 76.8 (+1.5), 无回退地形。回滚: --policy-profile go2_v17 / go2_v13 / go2_v6",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v17pad": {
-   "npz": "ros2_controller/policies/go2_walk_v17pad.npz",
-   "_npz_note": "调试档: v17 权重 + 112 维零历史输入 (用于验证部署侧历史链路; 策略不依赖历史)",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v18h": {
-   "npz": "ros2_controller/policies/go2_walk_v18h.npz",
-   "_npz_note": "[实验档, 勿作默认] v18h (512-256 + 3 帧观测历史, 20.1M): 热启动自 v17, history=3 -> obs 355。**仿真 (warp) 显著优于 v17**: 512 env 同进程 真竖面 78.1 vs 74.6, hfield 78.5 vs 76.5, 方块竖面 73.6 vs 66.2。**但部署侧 (CPU MuJoCo + kp20) 平地闭环会倒** (10s 内 tilt 45°, 后退) —— 历史帧让策略对 sim2sim 动力学差异更敏感; 部署默认仍 v17。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v17": {
-   "npz": "ros2_controller/policies/go2_walk_v17.npz",
-   "_npz_note": "v17 (512-256 大网络, 20M 训练链的 8.6M 检查点): 用'精确等价扩展'热启动自 v13。真竖面 384env 6s 存活均值 76.2% (方块 66.4 / 楼梯 73.7 / 混合 82.8), hfield 均值 78.0%, 平地 CPU 100% (trot 53%, 滑移 0.393)。回滚: --policy-profile go2_v13 / go2_v6",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v13": {
-   "npz": "ros2_controller/policies/go2_walk_v13.npz",
-   "_npz_note": "v13 (竖面几何训练, 20.3M): 混合地形 hyb2 = 真竖面 box geom (boxes/stairs) + hfield (boxes/stairs/rough/slope)。真竖面 384env 6s 存活: 方块 58.6% / 楼梯 69.3% / 混合 77.9%; hfield 口径 72-82%; 平地 CPU 16x15s 100%, trot 54%, slip 0.383。回滚: --policy-profile go2_v6",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v5a": {
-   "npz": "ros2_controller/policies/go2_walk_v5a.npz",
-   "_npz_note": "v5a (20.07M, 187 点扫描 + mix 地形; v6 的起点) —— 部署对照用",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "_dist_note": "训练用的是 distribution_type=tanh_normal 之外的另一路? 不是 —— train_go2.py 用的是 tanh_normal，但**这个 pkl 里没有 tanh 的 squash 痕迹**时 eval_go2 会判成 normal。真正判据以 eval_go2.py 的自动识别为准，不要手工套 tanh。",
-   "_height_scan_note": "leg_fk 给出的是**单个标量**的'离地高度'估计 (接触腿正运动学中位数)，35 个采样点填的是同一个值；训练侧的 35 维是逐点的 z_base - h_ground(xy_i) - base。地形上这两者差多少见 docs/go2-deploy-readiness.md §5。",
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v28a1b": {
-   "npz": "ros2_controller/policies/go2_walk_v28a1b.npz",
-   "_npz_note": "[实验档, 不推荐默认] v28a1b: v25b + 髋动作/状态惩罚微调 4M。髋摆幅 -7% (hip_q 30.96->28.88 度), 但 warp 地形 -1~-4pp; 台阶无改善。保留用于对比。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v28c": {
-   "npz": "ros2_controller/policies/go2_walk_v28c.npz",
-   "_npz_note": "[实验档, 不推荐默认] v28c: v28a1b -> hyb2 巩固 2.5M。髋摆幅 -9% (warp 31.1->28.2 度; CPU 平地 hip_q p95 47.1/45.3/43.3/45.6 -> 44.2/43.5/40.9/42.5), flat 100%, 但 warp/stg1 -2~3pp、bg200 -6pp、台阶地形 -13~16pp -> 鲁棒性代价。台阶仍未学会 (bands2 climb 0.016m)。默认保持 go2_v25b。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v29c": {
-   "npz": "ros2_controller/policies/go2_walk_v29c.npz",
-   "_npz_note": "[v29 台阶专项, 待验收] 训练链: v25b -> 宽楼梯 0.02 (3M) -> 0.03+feet_clearance (2M) -> 0.05 (3M) -> 混合难度赛道 lanes1 0.03/0.05/0.08/0.11 (4.2M) -> hyb2 巩固 (3M)。训练侧新增 full_reset=True、progress/lazy_stop/termination、速度加权 feet_clearance、orientation -5、action_acc、非足端深穿透终止、多难度楼梯地形。台阶: 0.03m 上1级 91%/上2级 9.6%; 0.05m 上1级 47% (v25b 29%); 0.08m 仍弱。风险: hyb2/stg1/平地指标见 v29 验收; 若不如 v25b 则保持默认 v25b。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v31d": {
-   "npz": "ros2_controller/policies/go2_walk_v31d.npz",
-   "_npz_note": "[v31d 大网络+hyb2 巩固, 实验] v31c 再 2M hyb2 巩固。台阶 0.03m 上1级98%/上2级70%, 0.05m 上1级81%/上2级44%; 部署 CPU 24seed 总存活 80.8% (v29c 89.2), warp 存活比 v29c 低 2-32pp 但速度/髋更好。默认仍 v29c, 本档作为台阶激进取向对照。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v31e": {
-   "npz": "ros2_controller/policies/go2_walk_v31e.npz",
-   "_npz_note": "[v31e 二轮巩固, 不建议默认] v31d 再 3M hyb2 (lr2e-5, lazy-2/term-30)。部署 CPU 24seed 78.3%, 台阶也回落到 0.03m 上2级33%/0.05m 上1级39% —— 过度巩固会丢台阶能力, 仅留作证据。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v31c": {
-   "npz": "ros2_controller/policies/go2_walk_v31c.npz",
-   "_npz_note": "[v31c 台阶专精档, 实验] 1536-768 (net2wider), per-env 地形课程 (lanes2 riser 0.02-0.14) 6M + 更难课程 4M; 无 hyb2 巩固。台阶最强: 0.03m 上1级100%/上2级86%; 0.05m 上1级96%/上2级63%; 0.08m 上1级22%; 但部署地形 (hyb2/stg1/bg200 等) 存活率比 v29c 低, 只建议台阶专项/离线评估用。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v32": {
-   "npz": "ros2_controller/policies/go2_walk_v32.npz",
-   "_npz_note": "[v32 混合地形课程, 候选] 1536-768; 地形 mixed1 = 5 条隔离混合赛道 (台阶 riser 0.02/0.04/0.06/0.08/0.10 + 离散箱体区 + 碎石区), per-env 课程 (init_max2, success 3.5m, min 1.2m) 训练 6.2M。目标: 同时保留台阶攀爬与部署稳健性。验收数值见 docs/go2-v32-mixed-curriculum.md; 默认档仍看验收结果决定。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v32b": {
-   "npz": "ros2_controller/policies/go2_walk_v32b.npz",
-   "_npz_note": "[v32b 混合课程+短巩固, 候选] v32 (混合地形课程 6.2M, 台阶 0.03m 上2级95%/0.05m 74%) 再 0.8M hyb2 短巩固 (lr 1e-5, 全命令分布 vx0-1/vy±0.4/wz±1.5, RING 出生)。目标: 补回转向/全命令鲁棒性同时保留台阶收益。验收数值见 docs/go2-v32-mixed-curriculum.md。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  },
-  "go2_v33d": {
-   "npz": "ros2_controller/policies/go2_walk_v33d.npz",
-   "_npz_note": "[v33d 20M 长训练冠军, 候选默认] 混合地形课程 mixed1 + 70/30 混合命令分布 (前向偏置 70%, 全命令 30%) + 20M 步 4 段 lr 阶梯衰减 (4e-5->2e-5->1e-5->5e-6)。四段 eval_reward 466.9->570.2->620.5->750.4 单调上升, ep_len 612; 证明课程+命令混合+lr 衰减下延长训练有效。验收数值见 docs/go2-v32-mixed-curriculum.md。",
-   "train_robot": "go2",
-   "kp": 20,
-   "kd": 1,
-   "command": [
-    0.5,
-    0,
-    0
-   ],
-   "velocity_source": "estimator",
-   "height_scan_source": "raycast",
-   "action_clip_to_train_joint_range": true,
-   "ramp_s": 0,
-   "start_delay_s": 0,
-   "contact_force_thresh": 30,
-   "prepose_s": 1.5,
-   "prepose_kp": 20,
-   "prepose_kd": 1,
-   "clearance_hz": 3,
-   "scan": {
-    "nx": 17,
-    "ny": 11,
-    "x": [
-     -0.4,
-     1.2
-    ],
-    "y": [
-     -0.5,
-     0.5
-    ]
-   }
-  }
- },
- "safety": {
-  "mode_kp": 20,
-  "mode_kd": 1,
-  "crouch_depth": 0.35,
-  "crouch_s": 2,
-  "l2_policy": "crouch_then_damp"
- },
- "health": {
-  "estop_ms": 200,
-  "protect_ms": 60,
-  "stale_ms": 20,
-  "recover_s": 1,
-  "max_tilt_deg": 60,
-  "sigma_max": 0.5,
-  "sigma_warn": 0.2,
-  "optional_channels": [
-   "cmd_vel",
-   "height_scan"
-  ],
-  "confidence_channel": "linvel_conf",
-  "confidence_min": 0.3
- },
- "perception": {
-  "_note": "v6: 真机 Unitree L1 口径。mount_body = unitree_ros URDF radar_joint (机头前缘, 略低于躯干中心); vfov = 360x90 FOV 装配下俯 15° -> 相对水平 -60..+30°; self_occlusion = 射线打到机器人自身 geom 判为遮挡 (不再把机体从 raycast 排除); fill_local = 未观测格点填局部地面 (特征≈0), 与训练 v6 遮挡模型 fill 语义一致。",
-  "enable": false,
-  "_perf_note": "n_rays x rate_hz 决定 raycast 成本: 3000@50Hz 用逐条 mj_ray 实测 28ms/帧, 直接把 RTF 压到 0.39。默认改为 900@15Hz + mj_multiRay 批量投射 (~5.2ms/帧 x 15Hz = 78ms/s; 真机 L1 本身也就 10~20Hz)。要最真实的稠密点云: n_rays=3000, rate_hz=50, use_multiray=true。",
-  "n_rays": 900,
-  "rate_hz": 15.0,
-  "use_multiray": true,
-  "max_range": 6.0,
-  "height_above_ground": 0.3,
-  "mount_body": [
-   0.28945,
-   0.0,
-   -0.046825
-  ],
-  "vfov": [
-   -1.0472,
-   0.5236
-  ],
-  "min_range": 0.1,
-  "self_occlusion": true,
-  "map_resolution": 0.05,
-  "map_decay_s": 1.0,
-  "fill_local": true,
-  "seed": 0
- },
- "domain_gap": {
-  "profile": "sim_clean"
- }
 }

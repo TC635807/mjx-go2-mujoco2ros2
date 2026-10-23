@@ -1,6 +1,6 @@
 """viz/panels.py —— 原生 MjvFigure 实时曲线 + matplotlib(agg) 仪表盘图像 + 文字 HUD。
 
-契约见 docs/viz-interfaces.md 第 4 节。三个组件互不依赖，都只消费 VizFrame：
+契约见 docs/viz.md。三个组件互不依赖，都只消费 VizFrame：
 
     FigurePanel   -> handle.set_figures(viewports_figures)   原生 strip chart
     ImagePanel    -> handle.set_images(viewports_images)     matplotlib(agg) -> RGB uint8

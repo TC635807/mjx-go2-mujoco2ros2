@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tests/test_viz_scene.py —— viz/scene.py 验收（契约 docs/viz-interfaces.md §3）。
+"""tests/test_viz_scene.py —— viz/scene.py 验收（契约 docs/viz.md）。
 
 直接运行（不需要 pytest）：.venv/bin/python tests/test_viz_scene.py
 成功打印 "OK test_viz_scene: ..." 并以 0 退出。

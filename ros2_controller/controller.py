@@ -179,6 +179,9 @@ class PolicyController(BaseController):
         self._scan_n = int(getattr(obs_builder, "scan_n", 35))
         self._scan = np.zeros(self._scan_n)
         self._scan_source = "zero"
+        self._n_bad_scan = 0
+        self._scan_missing_since: Optional[float] = None
+        self._warned_scan_missing = False
         self._t_last: Optional[float] = None
 
     # ------------------------------------------------------------------ 生命周期
@@ -194,6 +197,9 @@ class PolicyController(BaseController):
         self._t_last = None
         self._zc = None
         self._zc_raw = None
+        self._n_bad_scan = 0
+        self._scan_missing_since = None
+        self._warned_scan_missing = False
 
     # ------------------------------------------------------------------ 速度 / 离地高度
     def _linvel(self, state: LowState, t: float) -> Optional[np.ndarray]:
@@ -234,9 +240,25 @@ class PolicyController(BaseController):
 
     def _height_scan(self, state: LowState, t: float) -> np.ndarray:
         if self.height_scan_fn is not None:
-            sc = np.asarray(self.height_scan_fn(state, t), dtype=np.float64).reshape(-1)
-            self._scan_source = "external"
-            return sc
+            sc = self.height_scan_fn(state, t)
+            if sc is not None:
+                sc = np.asarray(sc, dtype=np.float64).reshape(-1)
+                if sc.size == self._scan_n:
+                    self._scan_source = "external"
+                    self._scan_missing_since = None
+                    self._warned_scan_missing = False
+                    return sc
+                # 话题里的点数与当前策略不匹配：不要静默喂错维度，降级到 leg_fk/nominal
+                self._n_bad_scan += 1
+            if not self._warned_scan_missing:
+                # 外部 height_scan 一直没数据：真机上说明 odom/点云链路没通，
+                # 此时策略吃的是"单个标量的 leg_fk"（平地近似、地形不可信），必须显式提示。
+                if self._scan_missing_since is None:
+                    self._scan_missing_since = float(t)
+                elif float(t) - self._scan_missing_since > 2.0:
+                    print("[ctrl] ⚠ 外部 height_scan 已 >2 s 无数据：回退 leg_fk（"
+                          "地形上不可信；检查 perception/odom/点云，或改用 --scan leg_fk 明确降级）")
+                    self._warned_scan_missing = True
         n_scan = self._scan_n
         if self.kin is None or self.height_scan_mode == "nominal":
             self._scan_source = "nominal"
@@ -315,6 +337,7 @@ class PolicyController(BaseController):
                "obs_valid": None if self.last_meta is None else bool(self.last_meta.valid),
                "linvel_source": None if self.last_meta is None else self.last_meta.linvel_source,
                "height_scan_source": self._scan_source,
+               "n_bad_scan": int(self._n_bad_scan),
                "ground_clearance_raw": None if self._zc_raw is None else round(float(self._zc_raw), 4),
                "ground_clearance": None if self._zc is None else round(float(self._zc), 4),
                "base_lin_vel_world": [round(float(x), 4) for x in self._vel],

@@ -1,6 +1,6 @@
 """sim_env/viz/scene.py —— MuJoCo 3D 叠加层（SceneOverlay）。
 
-契约: docs/viz-interfaces.md §3。所有数据只来自 VizFrame（viz/frame.py），
+契约: docs/viz.md。所有数据只来自 VizFrame（viz/frame.py），
 本模块**不**回头去掏 sim/controller 的字段，避免接口漂移。
 
 这一层是整个观察脚本最值钱的部分: 把策略"眼里"的 35 个高度采样点画进 3D 场景,

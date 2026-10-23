@@ -1,0 +1,958 @@
+{
+ "type": "drawnix",
+ "version": 1,
+ "source": "web",
+ "elements": [
+  {
+   "id": "g_ctrl",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "③ 控制层 ros2_controller/ · go2_controller 节点 · 50 Hz（仿真 / 真机同一份代码）"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     30,
+     232
+    ],
+    [
+     1512,
+     500
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "g_io",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "④ 信号 / 感知 / IO 层 signal_io/（go2_perception + transport；控制器只认话题，不认环境）"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     30,
+     532
+    ],
+    [
+     1512,
+     770
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "g_loop",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "⑦ LowState 回流（闭环）"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     30,
+     1056
+    ],
+    [
+     1512,
+     1208
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "g_run",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "⑧ 运行入口与验收（常用命令）"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     30,
+     1225
+    ],
+    [
+     1512,
+     1450
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "a1",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "① 配置 & 训练产物（离线）\nconfig/go2_sim.json：robot · io_profiles · 26 档 policy_profiles\nconfig/domain_gap.json：8 条训练↔真机域差 + SignalDegrader\nmjx-go2-training → ros2_controller/policies/：npz + json + .equiv.npz\nmjx-go2-training → sim_env/models/go2/：MJCF + 31 个地形 + terrains.json"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     30,
+     80
+    ],
+    [
+     800,
+     212
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "a2",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "② 入口 · 验收 · 观察（scripts/ + tests/）\nros2 launch ros2_ws/launch/{sim,real}.launch.py（ROS 2 节点图）\nsim_env/run_sim.py / ros2_controller/run_controller.py（--target 切仿真/真机）\nscripts/verify.py = 16 项验收；tests/run_tests.py = 14 个纯 Python 测试\nview_go2_policy.sh → view_policy.py；eval_terrain_matrix.py；export_policy.py"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     820,
+     80
+    ],
+    [
+     1512,
+     212
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "obs",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "obs.py\n243 维行走观测\n48 本体 + 187 高度扫描\n+ 8 trot 相位\n与训练 _get_obs 逐段对账"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     44,
+     282
+    ],
+    [
+     314,
+     480
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "policy",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "policy.py\n纯 numpy MLP\n默认 1536-768\n推理 0.70 ms（p99 1.45）\n输出 12 维关节位置目标"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     338,
+     282
+    ],
+    [
+     586,
+     480
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "controller",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "controller.py\nZero / Stand / Policy\nWbcLqrStub\n统一接口\nupdate(state,t) → LowCmd"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     610,
+     282
+    ],
+    [
+     862,
+     480
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "health",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "health.py\nL0 正常\nL1 降级 / L2 保护\nL3 急停（锁存）\n迟滞 + 逐级回落"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     886,
+     282
+    ],
+    [
+     1118,
+     480
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "safety",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "safety.py\nSafetyLimiter：限幅 · 斜率 · 看门狗\nSafetySupervisor：\ntrack → crouch → damping → estop\n真机 20 ms / 仿真 60 ms · L3 卸力"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     1142,
+     282
+    ],
+    [
+     1498,
+     480
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "msg",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "msg.py\nLowCmd 524 B / LowState 684 B\nCRC32 与宇树 crc32_core 逐位一致\n20 个电机槽位（Go2 用前 12）"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     44,
+     582
+    ],
+    [
+     359,
+     664
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "node",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "node.py\nSimNode / ControllerNode / Pacer\nSimNode：500 Hz 物理 + 发 LowState\nControllerNode：50 Hz 控制 + 500 Hz 保持 + 健康/安全"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     371,
+     582
+    ],
+    [
+     731,
+     664
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "cfg",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "config.py\ntarget / io_profiles 切换\napply_io_env()：domain / 网卡 / RMW\nload_config()：robot + policy profile"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     743,
+     582
+    ],
+    [
+     1023,
+     664
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "sense",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "estimator.py / perception.py / domain_gap.py\n腿式里程计补真机没有的基座线速度\n点云 → 高程图 → 187 点高度扫描\n延迟 / 丢包 / 噪声 / 偏置注入"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     1035,
+     582
+    ],
+    [
+     1497,
+     664
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "transport",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "transport/ — 同一 Transport 接口，4 个可互换后端\nloopback（同进程） · udp（双进程零依赖） · ros2（rclpy + rmw_cyclonedds_cpp） · dds（unitree_sdk2py；Python 3.14 不可用）\n仿真数据源 go2_sim_sensors → /go2/odom + /go2/lidar/points；真机固件 DDS 直接给 /lowstate、L1 给 /utlidar/cloud"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     44,
+     676
+    ],
+    [
+     1497,
+     754
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "sim",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "⑤ 仿真端 sim_env/ · 500 Hz\nrun_sim.py --publish-sensors → SimNode → robot.py:Go2Sim（MuJoCo 单环境）\nsim_dt = 2 ms · PD：τ = kp(q_des−q) + kd(0−dq) · 力矩限幅\n发布 /lowstate（500 Hz）+ /go2/odom（50 Hz）+ /go2/lidar/points（15 Hz）\nmodels/go2/：MJCF + 31 地形；viz/ 只读旁路"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     30,
+     790
+    ],
+    [
+     760,
+     1040
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "real",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "⑥ 真机端 real_env/ + ros2_ws/ · 500 Hz\nGo2 低层电机通道 dt = 2 ms（/lowstate / /lowcmd）\n真机固件 DDS → /lowstate（无需自写 bridge）；L1 → /utlidar/cloud（frame=utlidar_lidar）\ntarget = real_ros（ROS 2）；domain 0 + 有线网卡；real_sdk 当前 Python 3.14 不可用\n上电前 L2+R2 / ReleaseMode 释放 sport mode；控制器与仿真同一份代码"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     782,
+     790
+    ],
+    [
+     1512,
+     1040
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "loop",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "IMU + 12 关节 + 足端力 + tick → obs / health / safety；仿真侧另有 qvel / geom_xpos 真值\n仿真回环：MuJoCo → LowState → 控制层；真机回环：Go2 MCU → /lowstate → 控制层\n仿真侧看门狗 60 ms；真机侧 HealthMonitor 断流分级 40/80/250 ms → 阻尼/急停；SignalDegrader 注入域差压测降级路径"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     44,
+     1096
+    ],
+    [
+     1497,
+     1194
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "run_view",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "观察器 go2_viewer（ROS 2 节点，可选）\nscripts/view_go2_policy.sh → 自动拉起节点图 + viewer\n--terrain wide_h050 / mixed1 / rubble\n--headless / --record / --local（旧单进程）"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     44,
+     1276
+    ],
+    [
+     394,
+     1431
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "run_verify",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "消息 / 站立 / 实时性\npython scripts/verify.py --target sim_udp\n16/16；--quick 只跑单进程\npython tests/run_tests.py → 14/14"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     404,
+     1276
+    ],
+    [
+     744,
+     1431
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "run_parity",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "训练 ↔ 部署对账\nverify_train_deploy_obs.py：obs 逐段 max|diff| = 0\nverify_train_deploy_parity.py：PD 严格等价\n动作 jax vs numpy ≤ 1.15e-6"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     754,
+     1276
+    ],
+    [
+     1144,
+     1431
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "run_ros2",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "ROS 2 双进程 / 真机\nros2 launch ros2_ws/launch/sim.launch.py\nROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py\n详见 docs/ros2-setup.md / real_env/README.md"
+     }
+    ],
+    "type": "paragraph",
+    "align": "center"
+   },
+   "points": [
+    [
+     1154,
+     1276
+    ],
+    [
+     1498,
+     1431
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "tree",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "仓库结构\nmjx-go2-mujoco2ros2/\n├─ ros2_controller/      50 Hz 控制\n│  ├─ run_controller.py  入口\n│  ├─ controller.py      Zero/Stand/Policy\n│  ├─ obs.py             243 维观测\n│  ├─ policy.py          纯 numpy 前向\n│  ├─ health.py          L0–L3\n│  ├─ safety.py          限幅/斜率/看门狗\n│  └─ policies/          26 档 npz\n├─ signal_io/            信号 & IO\n│  ├─ msg.py             LowCmd/LowState\n│  ├─ config.py          target/io_profiles\n│  ├─ node.py            SimNode/ControllerNode\n│  ├─ transport/         local/udp/ros2/dds\n│  ├─ estimator.py       腿式里程计\n│  ├─ perception.py      高程图/扫描\n│  ├─ perception_node.py ROS 2 感知节点\n│  ├─ ros2_sensors.py    仿真 odom/点云\n│  └─ domain_gap.py      域差注入\n├─ sim_env/              仿真 500 Hz\n│  ├─ run_sim.py         仿真入口\n│  ├─ robot.py           Go2Sim\n│  ├─ models/go2/        MJCF + 31 地形\n│  └─ viz/               3D/曲线/面板/录制\n├─ real_env/             真机部署指南\n├─ config/               go2_sim.json\n│                        domain_gap.json\n├─ scripts/              观察/验收/对账/评测\n├─ tests/                12 个测试\n├─ ros2_ws/launch/       sim / real launch\n├─ ros2_ws/src/          unitree_go 消息包\n├─ third_party/          外部 SDK（未入库）\n└─ docs/                 架构 + 专项文档 + 图"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   },
+   "points": [
+    [
+     1548,
+     80
+    ],
+    [
+     2070,
+     740
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "io_matrix",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "target / IO / 环境\nsim_udp    udp      仿真（零依赖）\nsim_ros    ros2     仿真（ROS 2）\nsim_sdk    dds      仿真（SDK）\nreal_ros   ros2     真机 Go2\nreal_sdk   dds      真机 Go2\n\nloopback 仅用于单进程验证 / 观察器；\ndds 后端在 Python 3.14 下不可用（见 docs/ros2-setup.md）"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   },
+   "points": [
+    [
+     1548,
+     760
+    ],
+    [
+     2070,
+     995
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "contracts",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "关键契约\nobs = 243 = 48 本体 + 187 扫描 + 8 相位\naction = 12 个绝对关节位置目标\nPD：kp = 20 / kd = 1\nsim 500 Hz / 控制 50 Hz\n默认策略 go2_v33d（1536-768）\n26 档 profile；回退 go2_v29c"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   },
+   "points": [
+    [
+     1548,
+     1015
+    ],
+    [
+     2070,
+     1205
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "evidence",
+   "type": "geometry",
+   "shape": "rectangle",
+   "angle": 0,
+   "opacity": 1,
+   "text": {
+    "children": [
+     {
+      "text": "验证与数据\ntests/run_tests.py         14/14\nscripts/verify.py          16/16\nobs 对账                   逐段 max|diff| = 0\n动作 jax vs numpy          ≤ 1.15e-6\nPD vs <position>           1.1e-15 rad\n31 个地形 scene 契约测试   通过\n策略推理 0.70 ms（p99 1.45 ms）"
+     }
+    ],
+    "type": "paragraph",
+    "align": "left"
+   },
+   "points": [
+    [
+     1548,
+     1225
+    ],
+    [
+     2070,
+     1450
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "a00",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.5,
+     1.0
+    ],
+    "boundId": "g_ctrl"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.5,
+     0.0
+    ],
+    "boundId": "g_io"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     771.0,
+     500.0
+    ],
+    [
+     771.0,
+     532.0
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "a01",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.2395,
+     1.0
+    ],
+    "boundId": "transport"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.4959,
+     0.0
+    ],
+    "boundId": "sim"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     392.0,
+     754.0
+    ],
+    [
+     392.0,
+     790.0
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "a02",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.7591,
+     1.0
+    ],
+    "boundId": "transport"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.5,
+     0.0
+    ],
+    "boundId": "real"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     1147.0,
+     754.0
+    ],
+    [
+     1147.0,
+     790.0
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "a03",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.4959,
+     1.0
+    ],
+    "boundId": "sim"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.2443,
+     0.0
+    ],
+    "boundId": "g_loop"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     392.0,
+     1040.0
+    ],
+    [
+     392.0,
+     1056.0
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "a04",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.5,
+     1.0
+    ],
+    "boundId": "real"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.7537,
+     0.0
+    ],
+    "boundId": "g_loop"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     1147.0,
+     1040.0
+    ],
+    [
+     1147.0,
+     1056.0
+    ]
+   ],
+   "strokeWidth": 2
+  },
+  {
+   "id": "a05",
+   "type": "arrow-line",
+   "shape": "elbow",
+   "source": {
+    "marker": "none",
+    "connection": [
+     0.0,
+     0.4211
+    ],
+    "boundId": "g_loop"
+   },
+   "texts": [],
+   "target": {
+    "marker": "arrow",
+    "connection": [
+     0.0,
+     0.5
+    ],
+    "boundId": "obs"
+   },
+   "opacity": 1,
+   "points": [
+    [
+     30.0,
+     1120.0
+    ],
+    [
+     14.0,
+     1120.0
+    ],
+    [
+     14.0,
+     381.0
+    ],
+    [
+     44.0,
+     381.0
+    ]
+   ],
+   "strokeWidth": 2
+  }
+ ],
+ "viewport": {
+  "zoom": 0.62,
+  "origination": [
+   10,
+   10
+  ]
+ },
+ "theme": {
+  "themeColorMode": "default"
+ }
+}

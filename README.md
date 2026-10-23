@@ -9,7 +9,7 @@
 [![ROS 2](https://img.shields.io/badge/ROS%202-Lyrical-22314E?logo=ros&logoColor=white)](https://docs.ros.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Policies](https://img.shields.io/badge/policies-26%20profiles-2da44e)](config/go2_sim.json)
-[![Tests](https://img.shields.io/badge/tests-12%2F12%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-14%2F14%20passing-brightgreen)](tests/)
 
 **纯 numpy 策略推理（不需要 JAX）· 50 Hz 控制 / 500 Hz 物理 · 31 个评测地形 · 训练-部署逐段对账**
 
@@ -43,7 +43,7 @@
 
 ## ✨ 亮点
 
-- **一套代码，仿真 / 真机同构**：`ros2_controller`（50 Hz）+ `signal_io`（local / udp / ros2 / dds 四种传输）
+- **一套代码，仿真 / 真机同构**：`ros2_controller`（50 Hz）+ `signal_io`（loopback / udp / ros2 / dds 四种传输）
   + `sim_env`（500 Hz MuJoCo）/ `real_env`（Go2 真机），切换只改 `--target` 和网卡/domain。
 - **部署不依赖 JAX**：策略是导出的 npz（权重 + `obs_layout` 元数据 + `.equiv.npz` 等价性样本），
   `ros2_controller/policy.py` 纯 numpy 前向；1536-768 策略单次推理 **0.70 ms（p99 1.45 ms）**，
@@ -55,7 +55,8 @@
 - **26 档策略 profile**：默认 `auto → go2_v33d`（20.97M 步混合地形课程），
   回退 `go2_v29c`（hyb2 全命令最稳）/ `go2_v25b`，实验档 `v31c/d/e`、`v32/b`。
 - **可观测性**：3D 扫描点 / 高度扫描热图 / 4 腿相位 / obs 分段仪表盘 / 跟踪曲线 / CSV 记录；
-  健康层 L0-L3、安全监督（限幅 / 斜率 / 看门狗 / 阻尼 / 急停）、域差注入（延迟 / 丢包 / 噪声 / 偏置）。
+  健康层 L0-L3（含真机 lost/温度/bit_flag）、安全监督（限幅 / 斜率 / 阻尼 / 急停 / 断流保护）、
+  退出阻尼收尾、域差注入（延迟 / 丢包 / 噪声 / 偏置）。
 
 <a id="demo"></a>
 
@@ -82,40 +83,40 @@
 
 ## 🏗 架构：50 Hz 控制 + 500 Hz 物理
 
-```mermaid
-flowchart LR
-    subgraph PC["PC / 机器人板载"]
-        subgraph CTRL["ros2_controller · 50 Hz"]
-            OBS["obs.py<br/>243 维观测"] --> POL["policy.py<br/>纯 numpy MLP"]
-            POL --> HC["health.py<br/>L0-L3"]
-            HC --> SAFE["safety.py<br/>限幅/斜率/看门狗"]
-            SAFE --> CMD["LowCmd<br/>12 路力矩"]
-        end
-        subgraph IO["signal_io"]
-            TR["local / udp / ros2 / dds"]
-        end
-        subgraph SIM["sim_env · 500 Hz"]
-            R["Go2Sim PD 500 Hz"] --- T["31 个地形场景"]
-        end
-        REAL["real_env<br/>Go2 真机"]
-    end
-    CMD --> TR --> SIM
-    SIM -- "LowState 500 Hz" --> OBS
-    TR <--> REAL
-```
+<img src="docs/assets/系统架构图.png" alt="项目架构总览" width="100%" />
 
-- **500 Hz 层（电机驱动层）**：保持最近一条 `LowCmd`、按 N·m/s 限斜率、按关节限力矩、
-  仿真 60 ms / 真机 20 ms 看门狗。对应真机底层 `dt = 0.002 s` 的 low-level 通道。
-- **50 Hz 层（控制层）**：观测 → 策略 → 期望关节位置 → PD，只负责「算出这一拍的 12 个目标」。
+<sub>图由 `scripts/make_architecture_diagram.py` 生成；可编辑源文件是
+`docs/系统架构图.drawnix`；ROS 2 节点图由 `scripts/make_ros2_node_graph.py` 生成。
+完整的模块职责、目录说明与扩展点见 [**docs/architecture.md**](docs/architecture.md)。</sub>
+
+- **50 Hz 控制层**（`ros2_controller/`）：`obs.py` 构造 243 维观测 → `policy.py` 纯 numpy
+  前向出 12 维关节位置目标 → `health.py` 分级 → `safety.py` 限幅/看门狗 → `LowCmd`。
+- **500 Hz 电机层**（`signal_io/` + `sim_env/` / 真机）：保持最近一条 `LowCmd`、限斜率、
+  限力矩。看门狗 `watchdog_ms` 只作用于**仿真侧** `SafetyLimiter`（掉 LowCmd 清零力矩）；
+  真机侧靠 `HealthMonitor` 的 LowState 断流/NaN/姿态/电机健康分级 + `SafetySupervisor`
+  切阻尼/急停（阈值见 `health_profiles`，真机 `stale 40 / protect 80 / estop 250 ms`）。
+- **同一套 IO**：`loopback / udp / ros2 / dds` 四种传输，`--target` 决定打仿真还是真机。
 - **PD**：`tau = kp·(q_des − q) + kd·(0 − dq)`，`kp = 20`、`kd = 1`，clamp 到力矩限幅
   （与训练侧 `<position kp=20 kv=1 forcerange>` 等价）。
 
-<details>
-<summary>完整系统架构图（点击展开）</summary>
+### ROS 2 节点图：仿真 / 真机同构
 
-<img src="docs/assets/系统架构图.png" alt="系统架构图" width="100%" />
+<img src="docs/assets/ros2_node_graph.png" alt="ROS 2 节点图" width="100%" />
 
-</details>
+仿真和真机启动同一张节点图，**只替换数据源节点**：仿真用 MuJoCo 发
+`/lowstate` + 真值 `/go2/odom` + raycast `/go2/lidar/points`；真机直接用机器人固件
+DDS（ROS 2 侧 `/lowstate` / `/lowcmd`，无需自写 bridge）+ L1 点云 `/utlidar/cloud`。
+`go2_perception` 和 `go2_controller` 一行不改；真机默认 `scan:=leg_fk`（odom 不可靠时的安全档）。
+
+```bash
+# 仿真：sim_sensors + perception + controller
+ros2 launch ros2_ws/launch/sim.launch.py duration:=30
+
+# 真机：perception + controller；默认 controller=stand / scan=leg_fk（安全默认）
+ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=zero duration:=10
+ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=stand duration:=15
+ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=policy duration:=30
+```
 
 <a id="quickstart"></a>
 
@@ -129,14 +130,18 @@ cd mjx-go2-mujoco2ros2
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# 12 个纯 python 测试（消息/观测/感知/估计/健康/安全/策略/可视化/地形契约）
+# 14 个纯 python 测试（消息/CRC/循环/观测/感知/估计/健康/安全/策略/可视化/地形契约）
 python tests/run_tests.py
 
 # 16 项验收（消息层 / IMU / PD / 双进程实时性；不需要真机）
 python scripts/verify.py --target sim_udp
 ```
 
-### 观察器（默认策略 + 任意地形）
+### 观察器（自动拉起 ROS 2 节点图）
+
+观察器脚本会先启动 `sim_sensors + perception + controller` 三个 ROS 2 节点，
+再启动只订阅话题的 `go2_viewer`；关窗口 / Ctrl-C 时一起退出。
+没有 ROS 2 环境时用 `--local` 回到旧的单进程观察器。
 
 ```bash
 # 默认 go2_v33d，平地
@@ -152,8 +157,12 @@ bash scripts/view_go2_policy.sh --list-terrains         # 列出 31 个地形
 # 帧率/外观：隐藏机器人高模网格 + 限制同步频率
 bash scripts/view_go2_policy.sh --robot-style lite --sync-hz 30
 
-# 无 GUI / 录 CSV
+# 无 GUI / 录 CSV / 限定时长
 bash scripts/view_go2_policy.sh --headless --record logs/go2_view
+bash scripts/view_go2_policy.sh --duration 20
+
+# 旧版单进程观察器（不启动 ROS 2 节点）
+bash scripts/view_go2_policy.sh --local --terrain hyb2
 ```
 
 > 没有桌面时用 `--headless`；WSLg / llvmpipe 软件渲染下建议 `--robot-style lite`，
@@ -289,10 +298,12 @@ PROFILE=go2_v25b bash scripts/view_go2_policy.sh            # 回退
 
 | 项目 | 命令 | 结果 |
 |---|---|---|
-| 单元测试（纯 python，无 pytest） | `python tests/run_tests.py` | **12/12 通过** |
+| 单元测试（纯 python，无 pytest） | `python tests/run_tests.py` | **14/14 通过** |
 | 消息/IMU/PD/双进程实时性验收 | `python scripts/verify.py --target sim_udp` | **16/16 通过** |
 | 观测/动作对账 | `python scripts/verify_train_deploy_obs.py` | obs 逐段 0、动作 ≤1.15e-6 |
 | 物理等价性 | `python scripts/verify_train_deploy_parity.py --mode all` | 执行器严格等价 |
+| ROS 2 节点图（仿真） | `ros2 launch ros2_ws/launch/sim.launch.py` | sim_sensors + perception + controller 三节点闭环 |
+| 真机 LowCmd CRC（812 B 布局） | `python tests/test_go2_crc.py` | 4 组官方向量 + `crc_amd64.so` 逐字节一致 |
 
 覆盖：消息 CRC、观测布局与符号、LiDAR 感知与高程图、腿式里程计、健康层 L0-L3、安全监督、
 策略前向（含 `.equiv.npz` 回归）、可视化面板、地形碰撞契约。
@@ -303,23 +314,34 @@ PROFILE=go2_v25b bash scripts/view_go2_policy.sh            # 回退
 
 | target | 依赖 | 用途 |
 |---|---|---|
-| `sim_udp` / `sim_local` | 无 | 本机双进程 / 单进程仿真闭环 |
-| `sim_ros2` | 系统 ROS 2 + `ros2_ws` | 与真机同构的 ROS 2 话题闭环 |
-| `real_sdk` | `unitree_sdk2py` + cyclonedds | Go2 真机（官方 SDK，domain 0 + 有线网卡） |
-| `real_ros` | `rclpy` + `unitree_go` 消息包 | Go2 真机（ROS 2 话题 `rt/lowstate` / `rt/lowcmd`） |
+| `sim_udp` | 无 | 本机双进程仿真（裸 UDP，零中间件依赖） |
+| `sim_ros` | 系统 ROS 2 + `ros2_ws` | 与真机同构的 ROS 2 话题闭环 |
+| `sim_sdk` | `unitree_sdk2py` + cyclonedds | 官方 SDK 仿真（Python 3.14 暂不可用） |
+| `real_ros` | `rclpy` + `unitree_go` 消息包 | Go2 真机（ROS 2 话题 `/lowstate` / `/lowcmd`） |
+| `real_sdk` | `unitree_sdk2py` + cyclonedds | Go2 真机（官方 SDK，domain 0 + 有线网卡；Python 3.14 暂不可用） |
 
 ```bash
-# ROS 2 双进程（需要本机 ROS 2，见 docs/ros2-setup.md）
+# ROS 2 节点图（需要本机 ROS 2，见 docs/ros2-setup.md）
 source /opt/ros/<distro>/setup.bash && source ros2_ws/install/setup.bash
+ros2 launch ros2_ws/launch/sim.launch.py duration:=30
+ros2 launch ros2_ws/launch/sim.launch.py duration:=20 viewer:=true   # 带观察器节点
+# 或旧的两进程 demo（无独立感知节点，控制器回退 leg_fk）
 ./scripts/demo_ros2_policy.sh 12 go2 sim_clean
 
-# 真机（先在仿真里跑通 verify.py / check_go2_stand.py）
-python ros2_controller/run_controller.py --target real_sdk \
-    --controller policy --policy-profile go2_v33d --duration 20
+# 真机：先只读自检（不发送任何指令），再吊起来 zero -> stand -> policy
+scripts/run_with_ros2.sh scripts/go2_real_check.py --target real_ros --duration 5
+ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=zero duration:=10
+ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=stand duration:=15
+ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=policy duration:=30
+# 手动起控制器（没有可靠 odom 时自动回退 leg_fk）
+scripts/run_with_ros2.sh ros2_controller/run_controller.py --target real_ros \
+    --controller policy --policy-profile go2_v33d --scan leg_fk --linvel estimator --duration 20
 ```
 
-> 真机前必读：[`real_env/README.md`](real_env/README.md)（网络/domain/看门狗/急停 checklist）与
-> [`docs/go2-deploy-readiness.md`](docs/go2-deploy-readiness.md)。
+> 真机前必读：[`real_env/README.md`](real_env/README.md)（网络 / domain / 释放 sport mode /
+> CRC / 上电顺序 / 高度扫描风险 / 已知边界 checklist）。
+> `go2_real_check.py` 只订阅不发布：确认 `/lowstate` 频率、电机 mode、`/lowcmd` 是否有
+> 别的进程占用且 CRC 合法、L1 点云 frame/频率、odom 是否有数据。
 > 本仓不 vendor 第三方 SDK（`third_party/` 与 `ros2_ws/build|install|log` 未入库），
 > 获取方式见 `docs/ros2-setup.md`。
 
@@ -329,18 +351,24 @@ python ros2_controller/run_controller.py --target real_sdk \
 
 ```text
 mjx-go2-mujoco2ros2/
-├── ros2_controller/            # 50 Hz 控制器（run_controller / controller / obs / policy / health / safety）
-│   └── policies/               # 26 档 profile 对应的部署 npz（共 50 个，含历史档）+ .json 元数据
-├── signal_io/                  # 消息、传输（local/udp/ros2/dds）、估计器、感知、域差注入
+├── ros2_controller/            # 50 Hz 控制层（run_controller / controller / obs / policy / health / safety）
+│   └── policies/               # 26 档 profile 的部署产物：npz 权重 + json 元数据 + 可选 .equiv.npz
+├── signal_io/                  # 消息、IO profile、节点、传输、估计器、感知、ROS2 传感器桥、域差注入
+│   ├── go2_crc.py              #   真机 LowCmd 812B 布局 + CRC32（官方向量回归）
+│   ├── perception_node.py      #   ROS 2 感知节点（点云 -> height_scan）
+│   ├── ros2_sensors.py         #   仿真侧 odom + PointCloud2 发布
+│   └── ros2_debug.py           #   控制器 obs/action/info 调试发布
 ├── sim_env/                    # 500 Hz MuJoCo 仿真（Go2Sim）+ 31 个地形场景 + 可视化
 │   ├── models/go2/             # go2.xml + scene*.xml + assets/ + terrains.json
-│   └── viz/                    # 3D 叠加 / 曲线 / 仪表盘 / CSV 记录
-├── real_env/                   # 真机部署说明（real_sdk / real_ros）
+│   └── viz/                    # frame / scene / panels / live / record
+├── real_env/                   # 真机部署指南（real_ros / real_sdk）
 ├── config/                     # go2_sim.json（物理/IO/策略/安全/感知）+ domain_gap.json
-├── scripts/                    # 观察器、验收、探针、导出、对账、地形评测
-├── tests/                      # 12 个纯 python 测试
-├── docs/                       # 架构 / IO / 可视化 / 保真度 / 训练-部署 parity / 真机
-├── ros2_ws/src/unitree_go/     # 真机 ROS 2 消息包（build/install 未入库）
+├── scripts/                    # 观测入口（自动拉起 ROS2）/ 真机自检 / 验收 / 导出 / 对账 / 评测 / 架构图
+├── tests/                      # 14 个纯 Python 测试
+├── docs/                       # architecture / ros2-setup / results / parity / fidelity / viz + 架构图
+├── ros2_ws/launch/             # sim.launch.py / real.launch.py（ROS 2 节点图）
+├── ros2_ws/src/unitree_go/     # ROS 2 消息包（build/install 未入库）
+├── third_party/                # 外部 SDK（未入库）
 └── requirements.txt
 ```
 
@@ -370,15 +398,14 @@ python sim/export_deploy_terrains.py
 
 | 文档 | 内容 |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | 仿真 ↔ ROS 2 / DDS 双向闭环、50 Hz + 500 Hz 分层 |
-| [`docs/io-layer.md`](docs/io-layer.md) | local / udp / ros2 / dds 四种传输与消息语义 |
-| [`docs/go2-sim-fidelity.md`](docs/go2-sim-fidelity.md) | **仿真保真度排查全记录**：帧率三处开销、projected_gravity 符号 bug、CPU hfield 接触语义、地形视觉统一 |
-| [`docs/go2-train-deploy-parity.md`](docs/go2-train-deploy-parity.md) | 训练模型 ↔ 部署模型物理一致性验证 |
-| [`docs/go2-deploy-readiness.md`](docs/go2-deploy-readiness.md) | Go2 部署就绪度、站立/PD/网络 checklist |
-| [`docs/viz.md`](docs/viz.md) / [`docs/viz-interfaces.md`](docs/viz-interfaces.md) | 观察器面板、3D 叠加、录制的接口 |
-| [`docs/performance.md`](docs/performance.md) | 闭环性能与实时性数据 |
-| [`docs/ros2-setup.md`](docs/ros2-setup.md) | ROS 2 / CycloneDDS 环境配置 |
-| [`docs/results.md`](docs/results.md) | 验收与评测结果汇总 |
+| [`docs/architecture.md`](docs/architecture.md) | **架构总览**：分层、数据流、模块职责、目录结构、IO matrix、扩展点 |
+| [`docs/ros2-setup.md`](docs/ros2-setup.md) | ROS 2 / CycloneDDS 安装、`unitree_go` 构建、双进程运行、真机切换 |
+| [`docs/results.md`](docs/results.md) | 测试 / 验收 / 性能拆账 / 后端状态 / 地形评测 |
+| [`docs/go2-train-deploy-parity.md`](docs/go2-train-deploy-parity.md) | 训练 ↔ 部署一致性：执行器、观测/动作、物理参数与残余差异 |
+| [`docs/go2-sim-fidelity.md`](docs/go2-sim-fidelity.md) | 仿真保真度排查记录：帧率、`projected_gravity`、hfield 接触、地形视觉 |
+| [`docs/viz.md`](docs/viz.md) | 观察器（自动拉起 ROS 2 节点图）使用、参数与实现 |
+| [`real_env/README.md`](real_env/README.md) | 真机 Go2 部署：网络/domain、释放 sport mode、CRC、上电顺序、安全、高度扫描风险 |
+| [`docs/go2-sim2real-references.md`](docs/go2-sim2real-references.md) | Go2 sim2real 实战项目调研（真机跑通的项目、通信/网络/雷达/安全做法与坑） |
 
 <a id="license"></a>
 

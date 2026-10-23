@@ -5,7 +5,7 @@
     panels.py    MjvFigure 实时曲线 + matplotlib 仪表盘图像 + 文字 HUD
     record.py    CSV / 关键帧 / 汇总图 + 无界面终端仪表盘
 
-入口是 scripts/view_policy.py。契约见 docs/viz-interfaces.md。
+入口是 scripts/view_policy.py。契约见 docs/viz.md。
 """
 
 from .frame import (FrameCollector, FlatGround, RaycastGround, VizFrame,  # noqa: F401

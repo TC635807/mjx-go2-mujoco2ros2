@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tests/test_domain_gap.py —— domain_gap.py 验收（契约 docs/interfaces.md §7）。
+"""tests/test_domain_gap.py —— domain_gap.py 验收（契约 docs/architecture.md）。
 
 直接运行：python tests/test_domain_gap.py     （成功打印 OK 并以 0 退出）
 

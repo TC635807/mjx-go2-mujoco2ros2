@@ -30,22 +30,32 @@ DEFAULT_IO_PROFILES: Dict[str, Dict[str, Any]] = {
         "name": "udp", "host": "127.0.0.1", "cmd_port": 50001, "state_port": 50002,
         "crc_check": True, "watchdog_ms": 60.0, "realtime": True,
     },
+    # ROS 2 层话题名与 unitree_ros2 官方例程一致：/lowcmd、/lowstate。
+    # rmw_cyclonedds_cpp 会自动映射成 DDS 的 rt/lowcmd、rt/lowstate。
+    # sim_ros 也打开 crc_check：让真机固件要求的 CRC 在仿真里就被验证到。
+    # tick_dt: LowState.tick 每 +1 代表多少秒。仿真里 tick = 物理步数（2 ms/步），
+    # 真机固件里 tick 按 1 ms 递增 —— 控制器的时间基（prepose/ramp/health）靠它。
     "sim_ros": {
         "name": "ros2", "domain_id": 1, "interface": "lo",
-        "crc_check": False, "watchdog_ms": 60.0, "realtime": True,
+        "crc_check": True, "watchdog_ms": 60.0, "realtime": True,
+        "cmd_topic": "/lowcmd", "state_topic": "/lowstate", "tick_dt": 0.002,
     },
+    # raw DDS 后端（unitree_sdk2py）直接用固件话题名 rt/lowcmd、rt/lowstate。
     "sim_sdk": {
         "name": "dds", "domain_id": 1, "interface": "lo",
         "crc_check": False, "watchdog_ms": 60.0, "realtime": True,
+        "cmd_topic": "rt/lowcmd", "state_topic": "rt/lowstate", "tick_dt": 0.002,
     },
     # 真机：domain 0 + 有线网卡；看门狗收紧到 20 ms（真机底层掉指令就卸力）
     "real_ros": {
         "name": "ros2", "domain_id": 0, "interface": "eth0",
-        "crc_check": True, "watchdog_ms": 20.0, "realtime": True,
+        "crc_check": True, "watchdog_ms": 60.0, "realtime": True,
+        "cmd_topic": "/lowcmd", "state_topic": "/lowstate", "tick_dt": 0.001,
     },
     "real_sdk": {
         "name": "dds", "domain_id": 0, "interface": "eth0",
-        "crc_check": True, "watchdog_ms": 20.0, "realtime": True,
+        "crc_check": True, "watchdog_ms": 60.0, "realtime": True,
+        "cmd_topic": "rt/lowcmd", "state_topic": "rt/lowstate", "tick_dt": 0.001,
     },
 }
 
@@ -129,6 +139,12 @@ def load_config(path: str | None = None, overrides: Dict[str, Any] | None = None
         if tr_over:
             cfg["transport"] = _merge(cfg["transport"], tr_over)
 
+    # ---- 真机/仿真不同的健康阈值：真机 LowState 靠 DDS，偶发抖动比仿真大；
+    #      按 target 覆盖 health（例如真机 stale_ms 放宽到 40 ms，避免一次 GC 就 L1 下蹲）。
+    hp = cfg.get("health_profiles") or {}
+    if tgt in hp and hp[tgt]:
+        cfg["health"] = _merge(cfg.get("health") or {}, hp[tgt])
+
     # ---- 策略档：profile=auto 时按当前 robot 选；go2 档默认就是顶层 policy 块本身
     #      (所以 go2 的行为逐字不变)，go2 档必须显式写进 policy_profiles.go2。
     prof = cfg.pop("policy_profile", "auto")
@@ -168,6 +184,12 @@ def apply_io_env(cfg: Dict[str, Any]) -> Dict[str, str]:
     """ROS 2 / CycloneDDS 的环境变量必须在 rclpy.init / ChannelFactoryInitialize 之前设好。
 
     这里只设置、并返回一个 dict 方便调用方打印；真机那条（domain 0 + 网卡）就是靠它生效的。
+
+    网卡写法很重要：旧写法 `<NetworkInterfaceAddress>` 在 CycloneDDS 11（ROS 2 Lyrical
+    自带）里已被标记 **deprecated**（会打印警告、未来版本可能移除；本机实测中还出现过一次
+    与 `AllowMulticast` 组合触发 `set_and_check_allow_multicast` assert 的情况，行为不稳定）。
+    所以这里用 unitree_ros2 setup.sh 同款的新写法（无警告）：
+        <Interfaces><NetworkInterface name="eth0" .../></Interfaces>
     """
     io = cfg["transport"]
     env: Dict[str, str] = {}
@@ -177,10 +199,9 @@ def apply_io_env(cfg: Dict[str, Any]) -> Dict[str, str]:
         iface = io.get("interface")
         if iface and iface != "lo":
             env["CYCLONEDDS_URI"] = (
-                "<CycloneDDS><Domain><General>"
-                "<NetworkInterfaceAddress>%s</NetworkInterfaceAddress>"
-                "<AllowMulticast>true</AllowMulticast>"
-                "</General></Domain></CycloneDDS>" % iface
+                "<CycloneDDS><Domain><General><Interfaces>"
+                '<NetworkInterface name="%s" priority="default" multicast="default" />'
+                "</Interfaces></General></Domain></CycloneDDS>" % iface
             )
         for k, v in env.items():
             os.environ[k] = v

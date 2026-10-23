@@ -9,7 +9,7 @@
 
 没有 Qt 后端时 LivePlots.available() 返回 False，调用方退化成旧的内嵌面板。
 
-契约见 docs/viz-interfaces.md；数据只消费 VizFrame。
+契约见 docs/viz.md；数据只消费 VizFrame。
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ class LivePlots:
 
     def __init__(self, which: Sequence[str] = ("tau", "height", "vel", "scan", "phase", "act"),
                  window_s: float = 6.0, dpi: int = 100, figsize: Tuple[float, float] = (13.0, 7.5),
-                 title: str = ""):
+                 title: str = "", scan_nx: int = 7, scan_ny: int = 5):
         import matplotlib
         matplotlib.use("QtAgg", force=True)
         import matplotlib.pyplot as plt
@@ -59,6 +59,8 @@ class LivePlots:
         matplotlib.rcParams["axes.unicode_minus"] = False
         self._plt = plt
         self.which = tuple(which)
+        self.scan_nx = max(1, int(scan_nx))
+        self.scan_ny = max(1, int(scan_ny))
         self.window_s = float(window_s)
         self.n_draw = 0
         self.t_draw = 0.0
@@ -99,9 +101,11 @@ class LivePlots:
         self.ax_v.grid(alpha=0.25)
         self.ax_v.legend(fontsize=7, loc="upper left")
 
-        self._scan_img = self.ax_scan.imshow(np.zeros((7, 5)), cmap="coolwarm",
-                                             vmin=-1.75, vmax=1.75, origin="lower", aspect="auto")
-        self.ax_scan.set_title("height scan 7x5（负=上坡) ", fontsize=9)
+        self._scan_img = self.ax_scan.imshow(
+            np.zeros((self.scan_nx, self.scan_ny)), cmap="coolwarm",
+            vmin=-1.75, vmax=1.75, origin="lower", aspect="auto")
+        self.ax_scan.set_title("height scan %dx%d（负=上坡)" % (self.scan_nx, self.scan_ny),
+                               fontsize=9)
         self.ax_scan.set_xlabel("y: 右 -> 左", fontsize=7)
         self.ax_scan.set_ylabel("x: 前 ->", fontsize=7)
         self.ax_scan.tick_params(labelsize=7)
@@ -147,7 +151,13 @@ class LivePlots:
         self._ve.append(float(np.linalg.norm(frame.base_lin_vel_world)))
         vtf = frame.base_lin_vel_truth
         self._vt.append(float("nan") if vtf is None else float(np.linalg.norm(vtf)))
-        self._scan = np.asarray(frame.height_scan, dtype=np.float64).reshape(7, 5)
+        scan = np.asarray(frame.height_scan, dtype=np.float64).reshape(-1)
+        want = self.scan_nx * self.scan_ny
+        if scan.size != want:
+            buf = np.zeros(want, dtype=np.float64)
+            buf[:min(want, scan.size)] = scan[:min(want, scan.size)]
+            scan = buf
+        self._scan = scan.reshape(self.scan_nx, self.scan_ny)
         self._phase = np.asarray(frame.phase, dtype=np.float64).reshape(-1)[:4]
         self._act = np.asarray(frame.action, dtype=np.float64).reshape(-1)[:12]
         self._level = frame.level_name
@@ -196,8 +206,9 @@ class LivePlots:
 
         self._scan_img.set_data(self._scan)
         self._scan_img.set_clim(-1.75, 1.75)
-        self.ax_scan.set_title("height scan 7x5  min=%.2f max=%.2f（负=上坡）"
-                               % (float(self._scan.min()), float(self._scan.max())), fontsize=9)
+        self.ax_scan.set_title("height scan %dx%d  min=%.2f max=%.2f（负=上坡）"
+                               % (self.scan_nx, self.scan_ny,
+                                  float(self._scan.min()), float(self._scan.max())), fontsize=9)
 
         ph = np.asarray(self._phase)
         for b, v in zip(self._ph_cos, np.cos(ph)):

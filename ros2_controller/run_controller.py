@@ -58,7 +58,8 @@ def joint_ranges(xml_path: str):
     return np.array(lo), np.array(hi)
 
 
-def build_policy_controller(cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None):
+def build_policy_controller(cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None,
+                            scan_holder=None):
     from signal_io.estimator import LegKinematics, LegOdometry
     from ros2_controller.obs import WalkObsBuilder, WalkObsConfig
     from ros2_controller.policy import NumpyMLPPolicy, load_policy_meta
@@ -152,7 +153,14 @@ def build_policy_controller(cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None):
     # 遮挡模型一致 (未观测格点填局部地面 = 特征 0)。
     height_scan_fn = None
     hsrc = str(p.get("height_scan_source", "leg_fk"))
-    if hsrc == "raycast":
+    if hsrc == "topic":
+        if scan_holder is None:
+            raise SystemExit("--scan topic 需要 ROS 2 transport 与 /perception/height_scan 订阅")
+        def height_scan_fn(state, t, _h=scan_holder):  # noqa: ANN001
+            data = _h.get("data")
+            return None if data is None else np.asarray(data, dtype=np.float64)
+        print("[ctrl] 感知链路   = topic /perception/height_scan (无数据时回退 leg_fk)")
+    elif hsrc == "raycast":
         from signal_io.perception import HeightMapper, SimLidar
         perc = dict(cfg.get("perception") or {})
         mapper = HeightMapper(
@@ -207,6 +215,11 @@ def build_policy_controller(cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None):
     # 速度来源: 仿真里用真值(oracle)才和训练观测同分布; 真机只能走 leg odometry。
     # 训练侧 obs 0:3 = data.qvel[0:3] (oracle), 所以 sim 闭环默认 oracle。
     linvel_mode = str(linvel or p.get("linvel_source", "estimator"))
+    if linvel_mode == "oracle":
+        # run_controller 永远跑在独立进程里，本地 Go2Sim 不会步进；oracle 在这里是
+        # 一份静止快照，喂给策略等于错误观测。ROS 2 外部控制器统一走腿式里程计。
+        print("[ctrl] 注意：独立进程无法提供仿真真值，--linvel oracle -> estimator")
+        linvel_mode = "estimator"
     linvel_fn = None
     if linvel_mode == "oracle":
         def linvel_fn(state, t, _sim=sim):        # noqa: ANN001
@@ -240,10 +253,12 @@ def build_policy_controller(cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None):
     return ctrl
 
 
-def build_controller(name: str, cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None):
+def build_controller(name: str, cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None,
+                     scan_holder=None):
     c = cfg.get("controller", {})
     if name == "policy":
-        return build_policy_controller(cfg, sim, cli_cmd, linvel=linvel)
+        return build_policy_controller(cfg, sim, cli_cmd, linvel=linvel,
+                                       scan_holder=scan_holder)
     if name == "zero":
         return ZeroController()
     if name == "lqr_stub":
@@ -260,8 +275,11 @@ def main() -> int:
     ap.add_argument("--cmd", type=float, nargs=3, default=None, help="策略的速度指令 (m/s, m/s, rad/s)")
     ap.add_argument("--linvel", default=None, choices=["oracle", "estimator"],
                     help="速度来源: oracle=仿真真值(与训练同分布), estimator=腿式里程计(真机路径)")
-    ap.add_argument("--scan", default=None, choices=["nominal", "leg_fk", "raycast"],
-                    help="height scan 来源：nominal=按标称站高（平地最稳）；leg_fk=接触腿正运动学（能看地形）")
+    ap.add_argument("--scan", default=None, choices=["nominal", "leg_fk", "raycast", "topic"],
+                    help="height scan 来源：topic=订阅 /perception/height_scan（推荐）；"
+                         "leg_fk=接触腿正运动学；nominal=标称站高；raycast=同进程 raycast（调试）")
+    ap.add_argument("--scan-topic", default="/perception/height_scan",
+                    help="--scan topic 时订阅的高度扫描话题（std_msgs/Float32MultiArray）")
     ap.add_argument("--clearance-hz", type=float, default=None, help="离地高度低通截止频率 (Hz)")
     ap.add_argument("--duration", type=float, default=20.0)
     ap.add_argument("--target", default=None,
@@ -272,6 +290,10 @@ def main() -> int:
     ap.add_argument("--no-health", action="store_true", help="关掉健康层（退回 v1 的纯直通）")
     ap.add_argument("--no-supervisor", action="store_true", help="关掉安全监督器")
     ap.add_argument("--json", default=None)
+    ap.add_argument("--no-damping", action="store_true",
+                    help="退出时不发阻尼收尾（真机默认会发 100 ms kp=0/kd=8）")
+    ap.add_argument("--publish-debug", action="store_true",
+                    help="发布观察器需要的调试话题（obs/action/info），仅 ROS2 target 可用")
     ap.add_argument("--policy-profile", default=None,
                     help="策略档: auto(默认, 按 --robot 选) / go2 / go2; "
                          "用 go2 可以在 go2 机器人上跑 Go2 策略 (移植验证场景)")
@@ -283,6 +305,14 @@ def main() -> int:
         cfg["transport"]["name"] = args.transport
     if args.scan:
         cfg.setdefault("policy", {})["height_scan_source"] = args.scan
+    else:
+        # run_controller 是独立进程：raycast 只能读到本地未步进的模型快照。
+        # 没有显式 --scan raycast 时，ROS 2 路径默认退回 leg_fk；launch 会显式传 topic。
+        _hsrc = str((cfg.get("policy") or {}).get("height_scan_source", "leg_fk"))
+        if _hsrc == "raycast" and cfg["transport"]["name"] in ("ros2", "dds"):
+            print("[ctrl] 注意：独立控制器不能用 raycast（本地模型不步进），改用 leg_fk；"
+                  "需要真感知请加 --scan topic")
+            cfg.setdefault("policy", {})["height_scan_source"] = "leg_fk"
     if args.clearance_hz is not None:
         cfg.setdefault("policy", {})["clearance_hz"] = args.clearance_hz
     # 只借模型拿标称站姿/关节范围，不参与仿真。
@@ -295,8 +325,23 @@ def main() -> int:
                  sim_dt=cfg["sim_dt"])
     env = apply_io_env(cfg)
     tr = make_transport(cfg["transport"], role="controller")
+
+    # 高度扫描从 /perception/height_scan 订阅：仿真与真机同一份控制器代码
+    scan_holder = None
+    if (cfg.get("policy") or {}).get("height_scan_source") == "topic":
+        if cfg["transport"]["name"] != "ros2":
+            raise SystemExit("--scan topic 需要 --target sim_ros / real_ros（当前 %r）"
+                             % cfg["transport"]["name"])
+        from std_msgs.msg import Float32MultiArray
+        scan_holder = {"data": None, "n": 0}
+        def _on_scan(msg, _h=scan_holder):  # noqa: ANN001
+            _h["data"] = np.asarray(msg.data, dtype=np.float64)
+            _h["n"] += 1
+        tr.create_subscription(Float32MultiArray, args.scan_topic, _on_scan)
+        print("[ctrl] scan 订阅 =", args.scan_topic)
+
     ctrl = build_controller(args.controller, cfg, sim, cli_cmd=args.cmd,
-                            linvel=args.linvel)
+                            linvel=args.linvel, scan_holder=scan_holder)
 
     health = supervisor = None
     if not args.no_health:
@@ -313,8 +358,17 @@ def main() -> int:
         if s.get("l2_policy"):
             supervisor.l2_policy = str(s["l2_policy"])
 
+    debug = None
+    if args.publish_debug:
+        if cfg["transport"]["name"] != "ros2":
+            raise SystemExit("--publish-debug 需要 ROS2 transport（sim_ros / real_ros）")
+        from signal_io.ros2_debug import ControllerDebugPublisher
+        debug = ControllerDebugPublisher(tr)
+        print("[ctrl] debug 话题 = /go2/controller/{obs,action,info}")
+
     node = ControllerNode(tr, ctrl, sim_dt=cfg["sim_dt"], control_dt=cfg["control_dt"],
-                          health=health, supervisor=supervisor)
+                          health=health, supervisor=supervisor,
+                          on_control=(debug.publish if debug is not None else None))
     print("[ctrl] io         =", io_summary(cfg))
     if env:
         print("[ctrl] env        =", env)
@@ -324,9 +378,27 @@ def main() -> int:
         summary = node.run(args.duration, realtime=not args.no_realtime)
     except KeyboardInterrupt:
         summary = {"interrupted": True}
+    finally:
+        # 真机退出收尾：先发一段阻尼再断流。官方没有公开"lowcmd 断流后固件怎么处理"，
+        # 主动阻尼比"保持最后一条策略指令"安全。
+        if cfg["target"].startswith("real_") and not args.no_damping:
+            try:
+                if node.emergency_stop():
+                    print("[ctrl] 退出收尾：已发 100 ms 阻尼指令（kp=0, kd=8）")
+            except Exception as exc:  # 收尾失败不能掩盖 summary
+                print("[ctrl] 阻尼收尾异常:", repr(exc)[:160])
+        try:
+            tr.close()
+        except Exception:
+            pass
+    if summary.get("n_state", 0) == 0:
+        print("[ctrl] ⚠ 整个运行期没有收到任何 /lowstate：检查网线 / 网段 / ROS_DOMAIN_ID / "
+              "CYCLONEDDS_URI 网卡 / 话题名（应为 /lowstate）")
     summary["io"] = {"target": cfg["target"], "profile": dict(cfg["transport"])}
     summary["robot"] = cfg["robot"]
     summary["cmd_vel"] = list(args.cmd) if args.cmd is not None else (cfg.get("policy") or {}).get("command")
+    if debug is not None:
+        summary["debug"] = debug.stats()
     print("[ctrl] summary =", json.dumps(summary, ensure_ascii=False))
     if args.json:
         os.makedirs(os.path.dirname(os.path.abspath(args.json)), exist_ok=True)

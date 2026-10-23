@@ -141,6 +141,12 @@ class LowCmd:
     motor_cmd: List[MotorCmd] = field(default_factory=lambda: [MotorCmd() for _ in range(NUM_MOTOR)])
     reserve: List[int] = field(default_factory=lambda: [0, 0, 0, 0])
     crc: int = 0
+    # --- unitree_go LowCmd_ 的固定头：真机固件要求 FE EF / level_flag=0xFF ---
+    # 本地(loopback/udp)后端不用这两个字段；ROS 2 / DDS 后端下发前会写进消息。
+    head: List[int] = field(default_factory=lambda: [0xFE, 0xEF])
+    level_flag: int = 0xFF
+    frame_reserve: int = 0
+    gpio: int = 0
     # --- 下面两个只服务本地传输层，DDS 后端不用 ---
     seq: int = 0
     stamp: float = 0.0
@@ -183,6 +189,9 @@ class LowState:
     foot_force: List[int] = field(default_factory=lambda: [0, 0, 0, 0])
     tick: int = 0
     mode_machine: int = 0
+    # 真机 LowState.bit_flag（bit0=操作指令超时、bit7=电机超时、bit5=遥控超时…）；
+    # 仿真侧恒 0。健康层用它判断"指令是否真的在到达机器人"。
+    bit_flag: int = 0
     # --- 本地传输层用 ---
     seq: int = 0
     sim_time: float = 0.0
@@ -217,6 +226,7 @@ class LowState:
         st.foot_force = list(v[off : off + 4])
         st.tick = int(v[off + 4])
         st.crc = int(v[off + 5])
+        st.bit_flag = 0
         return st
 
     def q12(self) -> np.ndarray:

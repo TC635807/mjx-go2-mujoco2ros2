@@ -3,7 +3,7 @@
 
 IO 层由 --target 决定（见 signal_io/config.py 的 io_profiles）：
     sim_udp  裸 UDP，不需要 ROS 2
-    sim_ros  IOROS：rclpy + unitree_go，话题 rt/lowcmd / rt/lowstate
+    sim_ros  IOROS：rclpy + unitree_go，话题 /lowcmd / /lowstate
     sim_sdk  IOSDK：unitree_sdk2py（Python 3.14 下不可用）
 
 机型由 --robot 决定（models/go2 是训练侧模型、models/go2 是部署侧真机模型）。
@@ -11,8 +11,8 @@ IO 层由 --target 决定（见 signal_io/config.py 的 io_profiles）：
 （延迟/丢帧/噪声/偏置），用来复现健康层的降级路径 —— 详见 domain_gap.SignalDegrader。
 
 例:
-    python scripts/run_sim.py --target sim_ros --robot go2 --duration 20 --viewer
-    python scripts/run_sim.py --target sim_udp --robot go2 --profile real_severe
+    python sim_env/run_sim.py --target sim_ros --robot go2 --duration 20 --viewer
+    python sim_env/run_sim.py --target sim_udp --robot go2 --profile real_severe
 """
 
 from __future__ import annotations
@@ -44,6 +44,8 @@ def main() -> int:
                     help="被仿真的机型（只保留 go2；训练侧模型在 mjx-go2-training 仓）")
     ap.add_argument("--scene", default=None, choices=["default", "flat"],
                     help="flat = 纯平面（策略闭环对比用，排除地形变量）")
+    ap.add_argument("--terrain", default="flat",
+                    help="地形名（sim_env/models/go2/terrains.json；如 wide_h050/hyb2/rubble）")
     # 接触/求解器档位默认值来自 config 的 robots.<robot> 段（go2 默认软接触 + 100/50，
     # go2 不写 -> 保持本框架既有默认 = 硬接触 + MuJoCo 默认迭代）。三态：显式 flag 覆盖配置。
     ap.add_argument("--soft-feet", dest="soft_feet", action="store_const", const=True, default=None,
@@ -68,18 +70,31 @@ def main() -> int:
     ap.add_argument("--no-safety", action="store_true", help="关掉看门狗/斜率限幅")
     ap.add_argument("--log", default=None, help="把状态写进 CSV")
     ap.add_argument("--json", default=None, help="把总结写进 JSON")
+    ap.add_argument("--publish-sensors", action="store_true",
+                    help="把 MuJoCo 真值发布成与真机同名的 ROS 2 话题："
+                         "/go2/odom（nav_msgs/Odometry）+ /go2/lidar/points（PointCloud2）")
+    ap.add_argument("--odom-topic", default="/go2/odom")
+    ap.add_argument("--points-topic", default="/go2/lidar/points")
+    ap.add_argument("--sensor-hz", type=float, default=None,
+                    help="雷达点云发布频率（默认取 config.perception.rate_hz）")
     args = ap.parse_args()
 
     cfg = load_config(args.config, target=args.target, overrides={"robot": args.robot})
     if args.transport:
         cfg["transport"]["name"] = args.transport
-    xml = model_xml(cfg)
-    if args.scene == "flat":
-        cand = os.path.join(os.path.dirname(xml), "scene_flat.xml")
-        if os.path.isfile(cand):
-            xml = cand
-        else:
-            print("[sim] 注意：%s 不存在，仍用 %s" % (cand, os.path.basename(xml)))
+    terrain_meta = None
+    if args.terrain and args.terrain != "flat":
+        from sim_env.terrain import load_terrain_manifest, resolve_terrain
+        terrain_meta = resolve_terrain(args.terrain, load_terrain_manifest())
+        xml = terrain_meta["scene"]
+    else:
+        xml = model_xml(cfg)
+        if args.scene == "flat":
+            cand = os.path.join(os.path.dirname(xml), "scene_flat.xml")
+            if os.path.isfile(cand):
+                xml = cand
+            else:
+                print("[sim] 注意：%s 不存在，仍用 %s" % (cand, os.path.basename(xml)))
 
     degrader = None
     if args.profile and args.profile != "sim_clean":
@@ -104,6 +119,11 @@ def main() -> int:
                    spec=robot_spec_of(cfg), foot_soft_contact=soft_feet,
                    solver_iterations=iters, solver_ls_iterations=ls_iters,
                    degrader=degrader)
+    if terrain_meta is not None:
+        from sim_env.terrain import spawn_on_terrain
+        spawn_on_terrain(node.sim, terrain_meta)
+        print("[sim] 地形   =", args.terrain, "| scene =", os.path.basename(xml),
+              "| 出生点已按地形清单设置")
     print("[sim] model =", xml)
     print("[sim] io    =", io_summary(cfg))
     print("[sim] robot =", cfg["robot"], "| 力矩上限", list(node.sim.torque_limits[:3]), "(hip/thigh, knee)")
@@ -116,11 +136,28 @@ def main() -> int:
         print("[sim] env   =", env)
     print("[sim] info  =", json.dumps(node.sim.info(), ensure_ascii=False))
     print("[sim] 步长   = %.4f s (%.0f Hz)" % (node.dt, 1.0 / node.dt))
+
+    sensors = None
+    if args.publish_sensors:
+        if cfg["transport"]["name"] != "ros2":
+            print("[sim] --publish-sensors 需要 --target sim_ros（当前 %r）"
+                  % cfg["transport"]["name"])
+            return 2
+        from signal_io.ros2_sensors import SimSensorPublisher
+        sensors = SimSensorPublisher(node.sim, cfg,
+                                     odom_topic=args.odom_topic,
+                                     points_topic=args.points_topic,
+                                     sensor_hz=args.sensor_hz)
+        print("[sim] sensors = %s + %s" % (args.odom_topic, args.points_topic))
     try:
         summary = node.run(args.duration, realtime=not args.no_realtime, viewer=args.viewer,
-                            log_path=args.log)
+                            log_path=args.log,
+                            on_step=(sensors.publish if sensors is not None else None))
     except KeyboardInterrupt:
         summary = {"interrupted": True}
+    if sensors is not None:
+        summary["sensors"] = sensors.stats()
+        sensors.close()
     summary["io"] = {"target": cfg["target"], "profile": dict(cfg["transport"])}
     print("[sim] summary =", json.dumps(summary, ensure_ascii=False))
     if args.json:

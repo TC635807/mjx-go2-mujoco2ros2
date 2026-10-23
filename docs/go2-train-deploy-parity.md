@@ -1,276 +1,90 @@
-# Go2 训练模型 ↔ 部署模型物理一致性验证
+# 训练 ↔ 部署一致性
 
-> 任务: M3 / task-4。验证 "训练侧 `<position kp=20 kv=1>`" 与 "部署侧 `<motor>` + wrapper PD" 是否物理等价。
-> 全部结论用 **CPU MuJoCo** 实测（`/home/tc63/mujoco/.venv/bin/python`, mujoco 3.12.0），未使用 GPU。
+本仓与训练仓没有包级依赖，耦合是"训练产物单向导出 + 同一契约两侧各实现一次"。
+本文汇总当前已验证的三类一致性：**执行器语义、观测/动作、物理参数**。
 
-**被验证的两个文件（脚本自动打印 sha256，因为训练侧文件仍在迭代）**
+## 0. 结论速览
 
-| 侧 | 文件 | sha256 (前 16) | mtime |
-|---|---|---|---|
-| 部署 | `mjx-go2-mujoco2ros2/models/go2/go2.xml` | `2014a3d76e30f17a` | 2026-10-17 09:45 |
-| 训练 | `mjx-go2-training/models/go2/go2_mjx_position.xml` | `59ff5cc339db2961` | 2026-10-17 15:52 |
+| 问题 | 结论 | 验证脚本 |
+|---|---|---|
+| 部署的 `<motor>` + PD 是否等价于训练的 `<position kp=20 kv=1>`？ | **严格等价**：1500 步后 `max|Δq| = 1.1e-15 rad`、`max|Δτ| = 4.6e-14 N·m` | `verify_train_deploy_parity.py` |
+| 部署观测是否就是训练观测？ | **逐段 `max|diff| = 0`**（243 维，含随机 roll/pitch 0.34 rad） | `verify_train_deploy_obs.py` |
+| 策略输出是否一致？ | jax(pkl) vs numpy(npz) 12 维动作 **`max|diff| ≤ 1.15e-6`** | `verify_train_deploy_obs.py` |
+| 导出的 npz 本身有没有精度损失？ | f32 highest vs f64 重算 **`max|diff| = 1.45e-6`** → PASS | `export_policy.py` |
+| 部署物理与训练物理差多少？ | 同一站姿下只差 **0.7 mm** | `compare_deploy_vs_train_physics.py` |
 
----
-
-## 0. 结论速览（先看这四条）
-
-| 问题 | 结论 |
-|---|---|
-| **1. 两个 XML 只有执行器与命名差异吗？** | **不是。除"执行器写法"（等价，见 §2）外还有 3 处实质物理差异**：足端 `condim 6→3`、足端 `solimp 0.001→0.023`、**全部 geom 的 `margin 0.001→0`**（56 个 geom）。另有 2 处非物理差异：body 树顺序（`FL,FR,RL,RR` → `FR,FL,RR,RL`）与 keyframe home。质量/惯量/关节限位/阻尼/armature/frictionloss/几何尺寸/摩擦系数 **逐项完全一致**。 |
-| **2. 轨迹等价吗？** | **执行器写法严格等价**：同一棵树、只改执行器写法，1500 步 (3 s) 后 `max\|Δq\| = 1.1e-15 rad`、`max\|Δτ\| = 4.6e-14 N·m`（§2.2a-1）。**但按各自出厂配置跑，3 s 后 `max\|Δq\| = 0.59 rad`（§3）** —— 差异全部来自接触模型 + 求解器迭代数，与执行器无关。 |
-| **3. 哪个参数造成偏差最大？** | 按"沉降平衡 + 0.5 s 小信号漂移"归因（§5）：**求解器迭代数 2/5（训练 env 默认）** 是最大单项（把训练侧迭代数对齐到 100/50，沉降关节差 7.84°→2.11°，漂移 0.209→0.0152 rad）；**足端接触模型（condim/solimp/margin）** 贡献剩下的 ~2°；其中 `condim 3→6` 单独改会造成失稳翻倒（末态倾角 +176.65°），说明 condim 与 solimp 必须成对改。 |
-| **4. 训练侧还需要改什么？** | **XML 本身不用改。** 执行器语义与真机 `τ=kp·e+kd·ė`（500 Hz 电机自算）逐项一致，力矩限幅 `forcerange` 也已正确设置（§2.4）；刚性体动力学与部署侧逐位一致（§2.2a-3）。**需要动的是部署侧的评测配置**：默认 `run_sim.py`（硬接触 + 100/50）复现不了训练物理，必须 `--soft-feet` 并让求解器迭代数可配（§7）。 |
-
----
-
-## 1. 复现命令
+## 1. 复现
 
 ```bash
-cd /home/tc63/mujoco/mjx-go2-mujoco2ros2
-XLA_PYTHON_CLIENT_PREALLOCATE=false XLA_PYTHON_CLIENT_MEM_FRACTION=0.15 \
-  /home/tc63/mujoco/.venv/bin/python scripts/verify_train_deploy_parity.py \
-  --mode all --json /tmp/go2_parity_final.json
+# 观测 / 动作逐段对账（需要训练仓路径）
+python scripts/verify_train_deploy_obs.py
 
-# 单跑某一节（harness/diff/actuator/trajectory/sensitivity/ablation/pose）
-... scripts/verify_train_deploy_parity.py --mode ablation
+# 执行器 + 轨迹 + 参数归因（纯 CPU）
+python scripts/verify_train_deploy_parity.py --mode all
 
-# 指定别的训练侧文件（训练侧 XML 更新后复查）
-... scripts/verify_train_deploy_parity.py --mode all \
-      --train-body /home/tc63/mujoco/mjx-go2-training/models/go2/go2_mjx_position.xml
+# 部署物理 vs 训练物理（调用训练仓 eval_go2.py 的同一套判据）
+python scripts/compare_deploy_vs_train_physics.py
 ```
 
-本次全部运行 **11.5 s**（纯 CPU），输出 JSON 在 `/tmp/go2_parity_final.json`（含逐元素 941 项差异全表 + 所有原始数字）。
+训练侧文件默认取 `../mjx-go2-training/models/go2/go2_mjx_position.xml` 与
+`../mjx-go2-training/sim/eval_go2.py`，可用 `--train-body` 指定其他版本。
 
-脚本做的事（不改任何既有文件；临时场景写到 workdir）：
+## 2. 执行器语义
 
-* 把每个 body XML 展开成"单文件 = body + 平地"场景（`meshdir` 绝对化，平地 geom **必须叫 `floor`**，因为训练侧 sensor 里有 `geom2="floor"`）。
-* 部署侧物理 = 项目自己的 `Go2Sim.write_cmd` 公式复刻；训练侧物理 = 真实 `<position>` 执行器（MuJoCo 内部算）。
-* 两个模型都按**关节名**索引 qpos/actuator，屏蔽两侧腿序不同。
+训练侧：
 
----
-
-## 2. 执行器语义：真的等价
-
-### 2.1 MuJoCo 编译结果（实测）
-
-| 侧 | 执行器 | gaintype/biastype | gainprm | biasprm | ctrlrange | forcerange |
-|---|---|---|---|---|---|---|
-| 部署 | `<motor ctrlrange>` | 0 / 0 (fixed/…none) | `[1,0,0]` | `[0,0,0]` | ±23.7(hip/thigh), ±45.43(knee) | **不限**（forceL=0） |
-| 训练 | `<position kp=20 kv=1 forcerange>` | 0 / 1 (fixed/affine) | `[20,0,0]` | `[0,-20,-1]` | = 关节限位 | ±23.7 / ±45.43 |
-
-两条公式：
-
-```
-<motor>    : force = gainprm[0]·ctrl                    = 1·ctrl     , ctrl 先被 clip 到 ctrlrange
-<position> : force = kp·ctrl - kp·q - kv·q̇              = kp(ctrl-q) - kv·q̇ , force 被 clip 到 forcerange
+```xml
+<position kp="20" kv="1" forcerange="-23.7 23.7"/>   <!-- 膝关节 ±45.43 -->
 ```
 
-> 注意（踩过的坑）：MuJoCo 的 `<position kp kv>` 编译出的 `biasprm = [0, -kp, -kv]`，**不是** `[0, -(kp+kv), -kv]`。
-> 已用独立最小模型逐点回归确认（q∈{−1.5…1.5}, q̇∈{0,2}, ctrl∈{−1,0,1}，force 与 `kp(ctrl−q)−kv·q̇` 完全吻合）。
+MuJoCo 内部：`force = kp·(ctrl − q) + kv·(0 − dq)`，再 clip 到 `forcerange`。
 
-部署侧 wrapper（`src/go2_bridge/robot.py:189`）：`v = m.kp*(m.q-q) + m.kd*(m.dq-dq) + m.tau`，随后 `clip` 到 `torque_limits`。
-策略路径（`controllers.py:287-294`）恒有 `m.dq = 0`、`m.tau = 0`，`kp/kd` 乘 ramp α（`config` 里 `policy.ramp_s = 0` ⇒ α≡1）。
-⇒ **wrapper 的 PD ≡ `<position kp=20 kv=1>`**。
+部署侧 `sim_env/robot.py`：
 
-### 2.2 实测等价性
-
-| 实验 | 设置 | 结果 |
-|---|---|---|
-| **2.2a-1 同树对照** | 同一份 `go2.xml`，只把 `<motor ctrlrange>` 换写成 `<position kp kv forcerange>`（= `convert_go2_model.py` 的逆变换，树/几何/质量/阻尼一字未动） | 1500 步：**`max|Δτ| = 4.6e-14 N·m`，`max|Δq| = 1.1e-15 rad`** ✅ 严格等价 |
-| **2.2a-3 无接触对照** | 关掉 `CONTACT`，部署模型 vs 真训练模型（其余全改回部署取值） | 1500 步 `max\|Δq\| = 4.4e-16 rad` ⇒ **刚性体动力学 + 驱动完全一致**，跨树差异是浮点级 |
-| 2.3 与项目 wrapper 对拍 | 脚本 PD vs `Go2Sim.write_cmd`，200 步随机目标 | `max\|Δτ\| = 0.000e+00 N·m` ✅ |
-| 2.2a-2 跨树对照 | 同 2.2a-1 但用真训练模型（腿序不同） | `max\|Δq\| = 1.2e-2 rad`（接触求解对约束顺序敏感 + 混沌放大；**不是**物理差异，见 2.2a-3） |
-
-### 2.4 `forcerange` 不是装饰：漏写会失控
-
-随机目标幅值 0.9 rad、持续 0.5 s，读 MuJoCo 自己的 `actuator_force` 峰值：
-
-| kp | forcerange | `\|τ\|` 峰值 (hip,thigh,calf 各 4 个) |
-|---|---|---|
-| 20 | 有 | `[23.7, 23.7, 31.2, 23.7, 23.7, 29.4, …]` ← hip/thigh 全部顶到限幅 |
-| 20 | 无 | `[30.3, 50.9, 31.2, 29.3, 60.8, 29.8, …]` |
-| 50 | 有 | `[23.7, 23.7, 45.4, 23.7, 23.7, 45.4, …]` ← 全部顶到限幅 |
-| 50 | 无 | `[75.1, 128.0, 71.0, 76.6, 150.3, 72.9, …]` |
-
-`autolimits="true"` 只把 `<position>` 的 `ctrlrange` 设成关节限位，**力矩限幅必须手写 `forcerange`**。训练侧写了（±23.7 / knee ±45.43），✅ 无风险。
-
----
-
-## 3. 结构差异全表（941 项逐元素对比 → 128 项不同 → 折叠 16 类）
-
-```
-| 组 | 差异类别 | deploy | train | 元素数 |
-|---|---|---|---|---|
-| 执行器 | act[*].biasprm | [0,0,…] | [0,-20,-1,…] | 12 |
-| 执行器 | act[*].gainprm | [1,0,…] | [20,0,…] | 12 |
-| 执行器 | act[*].gaintype+biastype | [0,0] | [0,1] | 12 |
-| 执行器 | act[*].ctrlrange+limited | ±23.7 / ±45.43 (力矩) | 关节限位 (4 类) | 12 |
-| 执行器 | act[*].forcerange+limited | 不限 (0,0,0) | ±23.7 / ±45.43 | 12 |
-| 几何/接触 | geom[*].margin | 0.001 | 0 | 56 |
-| 几何/接触 | geom[*].condim | 6 | 3 | 4 |
-| 几何/接触 | geom[*].solimp | [0.9,0.95,0.001,0.5,2] | [0.9,0.95,0.023,0.5,2] | 4 |
-| keyframe | home.qpos / home.ctrl | z=0.27, 0,0.9,-1.8 | z=0.32, ±0.1,0.8/1.0,-1.5 | 2 |
-| 树顺序 | worldbody / joint 顺序 | FL,FR,RL,RR | FR,FL,RR,RL | 2 |
+```python
+tau = kp * (q_des - q) + kd * (0.0 - dq) + tau_ff
+tau = clip(tau, TORQUE_LIMITS)
 ```
 
-**物理影响排序**（结合 §5 实测）：
+策略路径恒有 `tau_ff = 0`、`dq_des = 0`，`kp = 20`、`kd = 1`，因此与训练侧严格等价。
+注意：`<position>` 的 `forcerange` 不能省；只写 `ctrlrange` 不会限制力矩。
 
-1. **求解器迭代数（不在 XML 里，是训练 env 的运行期设置）** —— `envs/go2_walk.py` 默认 `solver_iterations=2, solver_ls_iterations=5`；部署侧 CPU MuJoCo 默认 100/50。
-2. **足端 `condim 6→3` + `solimp 0.001→0.023`**（软接触；`envs/go2_walk.py` 的 `foot_soft_contact=True` 默认与 XML 一致，两者同值所以运行期覆写不会改变结果）。**必须成对改**：单独把 condim 改 6 而留下软 solimp 会直接失稳。
-3. **`geom margin 0.001→0`**（56 个 geom，含视觉 geom）——影响最小（沉降关节差 2.1°→…，见 §5）。
-4. 质量/惯量/关节限位/阻尼 0.1/armature 0.01/frictionloss 0.2/几何尺寸与位置/足端 friction 0.4 0.02 0.01/`cone=elliptic impratio=100` —— **完全一致**（0 项差异）。
-5. body 树顺序 —— 无物理影响，但 **qpos[7:] 与 actuator 的下标顺序不同**，任何按下标取关节的代码都会静默错位（本项目两侧都用 `MOTOR_JOINTS = FR,FL,RR,RL` 按名字索引，✅）。
-6. keyframe home —— 是**策略接口**差异，不是物理差异，见 §6。
+## 3. 观测 / 动作
 
----
+观测 243 维 = 48 本体 + 187 高度扫描（17×11）+ 8 相位。逐段对账：
 
-## 4. 轨迹等价性（同一初始状态 + 同一串 q_des，50 Hz 零阶保持，500 Hz PD 重算）
+```text
+0:3   线速度 ×2          3:6   角速度 ×0.25      6:9   projected gravity
+9:12  指令 ×2           12:24  关节位置 − home   24:36 关节速度
+36:48 last_action        48:235 高度扫描          235:243 四腿相位
+```
 
-| 动作 | `max\|Δq\|` | RMS | `max\|Δdq\|` | `max\|Δτ\|` | 首次 `\|Δq\|>0.05` | 末态 z / tilt (部署 → 训练) |
-|---|---|---|---|---|---|---|
-| 固定站立 3 s，q_des=部署 home | 0.529 rad | 6.72e-2 | 51.8 | 40.4 N·m | 0.43 s | 0.1923 → 0.2201 / 8.44° → 18.31° |
-| 小信号 ±0.02 rad | 0.510 rad | 5.83e-2 | 48.5 | 40.4 N·m | 0.56 s | 0.1965 → 0.2079 / 7.50° → 15.65° |
-| 3 s 随机 + 3 s 站立 | 0.589 rad | 8.27e-2 | 56.9 | 42.3 N·m | 0.17 s | 0.1878 → 0.1878 / 9.05° → 9.17° |
-| 固定站立 5 s，q_des=**训练** home | 0.205 rad | 8.67e-2 | 10.3 | 11.3 N·m | 0.02 s | 0.2352 → 0.2331 / 3.40° → 1.54° |
+当前结果：**每一段 `max|diff| = 0`**。历史坑：`projected_gravity` 曾把旋转矩阵的
+第三列当第三行用，纯 yaw 时看不出来，一有 roll/pitch 重力符号就反了；修复后由
+`tests/test_obs.py` 用随机四元数回归。
 
-**读法**：
+动作 12 维 = 绝对关节位置目标，先按训练机型关节范围 clamp，再由部署侧 PD 转力矩。
+`go2_walk` 训练时 `normalize_observations=False`，部署侧同样**不套** `(x−mean)/std`；
+误用 normalizer 会让动作偏差达到数 rad。
 
-* 前两行里两个模型都在"软趴/要倒"的状态（z≈0.19 m、倾角 8–18°），因为 **`q_des = 部署 home (0, 0.9, -1.8)` 本身不是稳定工作点**，两边都在往下塌，于是差异被混沌放大，`max|Δq|` 不再适合当"物理一致性"指标。
-* 用**训练 home**（策略实际会待的姿态）时，两边都稳定站住，沉降 z 差 **7 mm**、倾角差 **1.9°**、沉降关节角最大差 **7.8°**。
-* 第 3 行（6 s 随机）末态反而很接近，纯属两个不同轨迹偶然落点相近 —— 不要用它下结论。
+## 4. 物理参数
 
-**结论**：执行器层面 0 差异；**"按各自出厂配置跑"时两侧确实存在可观测的动力学差异**，但全部来自接触模型 + 求解器（§5 归因），不是执行器。
+两侧模型逐项对比过质量、惯量、关节限位、阻尼、armature、frictionloss、几何尺寸、
+足端摩擦与接触参数。当前约定：
 
----
+- **足端硬接触**（`foot_soft_contact = false`）：v2/v33d 策略按硬接触训练，
+  部署模型保持 `condim=6`、MuJoCo 默认 `solimp`、`margin=0`；
+  训练模型已改成与部署模型逐项一致，因此"评测物理 == 训练物理"。
+- **求解器**：训练用 MJX warp（2/5 次迭代），CPU MuJoCo 无法复刻该欠解语义；
+  部署评测统一用收敛档 `solver_iterations=100 / solver_ls_iterations=50`。
+- **body 树顺序**：部署模型是 `FL,FR,RL,RR`，训练模型是 `FR,FL,RR,RL`；
+  代码一律按关节名 / `MOTOR_JOINTS` 索引，不能按下标硬取。
 
-## 5. 参数归因：把训练模型逐项改回部署取值
+## 5. 残余差异（不是 bug，但要知道）
 
-指标设计（避免混沌污染）：
-* **沉降量**：`q_des = 训练 home`，初始 z=0.32，跑 5 s，取 4–5 s 均值。
-* **短时漂移**：0.5 s 小信号随机目标的最大 `|Δq|`（混沌放大之前）。
-
-基线（训练原样 vs 部署原样）：**沉降 部署 z=0.2361 m / tilt 3.35° vs 训练 z=0.2332 m / tilt 1.41°；dz=−0.0029 m，dtilt=−1.94°，沉降关节角最大差 7.84°，0.5 s 漂移 0.209 rad。**
-
-| 改动（训练 → 部署取值） | dz (m) | dtilt (°) | 沉降 dq (°) | 0.5 s 漂移 (rad) | 相对基线 |
-|---|---|---|---|---|---|
-| 只改 **求解器 iterations 2/5 → 100/50** | −0.0029 | +1.64 | **2.11** | **0.0152** | 漂移降 **92.8%** |
-| 只改 **geom margin 0 → 0.001** | −0.0060 | +8.10 | 17.82 | 0.177 | 降 15.4% |
-| 只改 **solimp 0.023 → 0.001**（仍 condim 3） | +0.0028 | +21.16 | 15.91 | 0.322 | 恶化 54% |
-| 只改 **condim 3 → 6**（仍软 solimp 0.023） | −0.1792 | **+176.65** | 18.55 | 0.878 | **翻倒** |
-| 足端 + margin + 求解器 **全部**改回部署 | +0.0009 | +0.05 | **0.05** | **0.0067** | 降 **96.8%** |
-
-**归因结论**：
-
-1. **求解器迭代数是最大单项**。训练侧 `solver_iterations=2 / ls=5` 在 CPU Newton 下远未收敛；把它对齐到 100/50，沉降关节差从 7.84° 降到 2.11°、漂移从 0.209 降到 0.0152 rad。
-   ⚠️ **这条只在"部署侧 CPU MuJoCo 复现训练物理"的语境下成立**：MJX 的 warp 求解器用 2 次迭代是有意为之的近似求解器，语义与 CPU Newton 的"2 次迭代"不同。不能用它说"训练侧算错了"。
-2. **足端接触模型（condim 3 + 软 solimp）贡献剩下约 2° 沉降差**。`condim` 与 `solimp` **必须成对改**：单独把 condim 改成 6（留着软 solimp 0.023）会让机器人在训练 home 姿态下直接翻倒（末态倾角 +176.65°）—— 这正好解释了 Go2 阶段"软接触是 MJX 必需"的教训在 Go2 上反向成立。
-3. **`margin` 影响最小**（0.001 vs 0，56 个 geom），单独改它漂移只降 15.4%。
-4. 三项全改回部署后残差 0.05° / 0.0067 rad —— 与 §2.2a-3 的"跨树浮点级差异"一致，说明**再没有隐藏的物理差异**。
-
----
-
-## 6. kp/kd 敏感性扫描（3 s 固定站立）
-
-**q_des = 训练 home（稳定工作点）**
-
-| kp | kd | 部署 z / tilt | 训练 z / tilt | `max\|Δq\|` (rad) | 末态 Δq (°) | dz (m) |
-|---|---|---|---|---|---|---|
-| 20 | 0.5 | 0.2424 / 1.28° | 0.2267 / 7.34° | 0.530 | 14.07 | −0.0157 |
-| **20** | **1** | **0.2404 / 3.01°** | **0.2334 / 1.02°** | **0.205** | **7.73** | **−0.0070** |
-| 20 | 1.5 | 0.2399 / 3.66° | 0.2380 / 5.27° | 0.281 | 13.69 | −0.0019 |
-| 30 | 0.5 | 0.2746 / 1.69° | 0.2722 / 6.06° | 0.399 | 7.01 | −0.0024 |
-| 30 | 1 | 0.2754 / 1.51° | 0.2732 / 3.70° | 0.268 | 4.11 | −0.0022 |
-| 30 | 1.5 | 0.2759 / 1.44° | 0.2716 / 3.78° | 0.222 | 3.69 | −0.0043 |
-| 50 | 0.5 | 0.2948 / 0.58° | 0.2916 / 0.70° | 0.172 | 0.96 | −0.0032 |
-| 50 | 1 | 0.2949 / 0.53° | 0.2916 / 0.53° | 0.166 | 1.19 | −0.0033 |
-| 50 | 1.5 | 0.2950 / 0.53° | 0.2935 / 1.08° | 0.145 | 1.88 | −0.0016 |
-
-**q_des = 部署 home（不稳定工作点，供对照）**：整片都在塌，`max|Δq|` 0.01–0.72 rad 无规律，末态 tilt 差最大到 10°（kp20/kd1：8.44° vs 18.31°）。**只有 kp=50 时两侧才稳定且几乎重合**（z 0.2586 vs 0.2575，`max|Δq| = 1.1e-2`）。
-
-**读法**：
-
-* 提高增益能显著缩小两侧差异 → 与 §5 一致：**差异主要作用在接触/求解质量上，高增益下接触更"硬"、更收敛**。
-* **kp=20 / kd=1（训练与部署约定值）在部署 home 姿态下两侧都站不稳**（z≈0.19 m、倾角 8–18°）。这不是 train/deploy 不一致，而是 **Go2 用 kp=20 太低**：Go2（12 kg，home 0.8/−1.5）能站，Go2（15.2 kg）在该姿态下重力矩超出软 PD 的刚度。建议 Lead 复核 Go2 的 kp 取值（或用训练 home 姿态 + 更硬的接触）。这是**训练/部署共同的**问题，与移植一致性无关。
-
----
-
-## 7. 姿态契约（接口差异，非物理差异）
-
-| | keyframe home (FR,FL,RR,RL × hip,thigh,calf) | z |
-|---|---|---|
-| 部署 | `0, 0.9, -1.8` ×4 | 0.27 |
-| 训练 | `-0.1, 0.8, -1.5 / +0.1, 0.8, -1.5 / -0.1, 1.0, -1.5 / +0.1, 1.0, -1.5` | 0.32 |
-
-逐关节差：hip ±5.73°，thigh −5.73°，calf **+17.19°**。
-
-同一条 q_des 分别喂给两个模型（3 s 站立）：
-
-| q_des | 部署 z / tilt | 训练 z / tilt |
-|---|---|---|
-| 部署 home | 0.1923 / 8.44° | 0.2201 / **18.31°** |
-| 训练 home | 0.2404 / 3.01° | 0.2334 / **1.02°** |
-
-⇒ **必须用训练 home 做部署侧的预摆位目标**，否则策略第一眼看到 +17° 的 calf 偏差。项目配置里已经有这个安排（`config/go2_sim.json` 的 `policy.prepose_s=1.5 / prepose_kp=20 / prepose_kd=1` 与 `_prepose_note`），✅ 接口层已对齐。
-
----
-
-## 8. 装置自检 + 任务书 0.268 m 的口径差异
-
-任务书给的实测值：**训练 home + PD(kp=20,kd=1) → 躯干 z≈0.268 m，倾角 1.58°**。
-
-用同样口径（初始 z=0.32、q_des=训练 home、500 Hz PD、6 s）复跑：
-
-| 模型 | 沉降 z | 倾角 | z(t) 采样 (s→m) |
-|---|---|---|---|
-| 部署 `go2.xml` | 0.2353 | 3.39° | 0.5→0.2712, 1.0→0.2600, 2.0→0.2468, 3.0→0.2404, 6.0→0.2339 |
-| 训练 `go2_mjx_position.xml` | **0.2331** | **1.53°** | 0.5→0.2487, 1.0→0.2325, 2.0→0.2335, 6.0→0.2329 |
-
-* **倾角复现得很好**（1.53° vs 1.58°）。
-* **z 差 35 mm（0.233 vs 0.268）**，且整条 z(t) 曲线都不经过 0.268。顺带排查过：把 `imu` site 高度当"躯干 z"（+0.04232 m）得 0.275；menagerie Go2（damping=2、足端 solimp 0.015/1/0.022、friction 0.8）得 z=0.2217 / imu_z=0.2651 / tilt 2.41°；都没有同时命中 (0.268, 1.58)。
-  ⇒ **请 Lead 确认当初 0.268 的测量口径**（取的是 body origin 还是 imu site？哪个模型？哪个迭代数？），本报告一律用"躯干 body origin z"口径。
-* 两个模型的 z 只差 **2 mm**（0.2353 vs 0.2331），说明装置本身是自洽的。
-
----
-
-## 9. 训练侧是否要改？改什么？
-
-**XML 不用改。** 逐条回答任务书第 4 问（对齐真机 `τ = kp·e + kd·ė`，500 Hz 电机自算）：
-
-| 真机语义 | 训练侧现状 | 判定 |
-|---|---|---|
-| `τ = kp·(q_des−q) + kd·(dq_des−dq) + τ_ff`，`dq_des=0`, `τ_ff=0` | `<position kp=20 kv=1>`，MuJoCo 实测 `force = 20(ctrl−q) − 1·q̇` | ✅ **逐项一致**（1e-15） |
-| 力矩限幅 ±23.7 / knee ±45.43 N·m | `forcerange` 已写 | ✅ |
-| 500 Hz PD / 50 Hz 位置目标 | `sim_dt=0.002`（500 Hz）`ctrl_dt=0.02`（50 Hz），与部署一致 | ✅ |
-| 质量/惯量/关节限位/阻尼/armature/frictionloss | 与部署基线逐项相同（0 项差异） | ✅ |
-| —— | 足端 condim 3 + 软 solimp、margin 0 | ⚠️ 是**训练↔部署 sim 的差异**（MJX 数值稳定性必需），对真机而言两边都不是真值 |
-| —— | keyframe home 与部署不同 | ⚠️ 接口问题，部署侧用 prepose 对齐即可（已做） |
-
-**因此对训练侧的建议只有"可选加强"，没有"必须修改"**：
-
-1. （可选，影响最大）**把接触参数的域随机化打开**：足端 `friction`、`solimp`、`condim` 在 reset 时随机化。现在训练固定软接触，真机是另一种接触行为，这是当前最大的 sim2real 结构风险，且**无法靠改 XML 解决**。
-2. （可选）把 `solver_iterations` 与 `foot_soft_contact` 写进模型 meta / 报告，让"评测这套策略该用什么物理"没有歧义 —— 本次发现 `probe_policy_go2.py`、`run_sim.py` 的 `--soft-feet` 默认关闭（`view_policy.py` 默认开着），这是一个很容易踩的坑。
-3. （可选）`kp=20/kd=1` 对 15.2 kg 的 Go2 偏软（§6）：部署 home 姿态下两侧都站不稳。若策略依赖硬接触/高刚度，考虑在训练里用比部署更大的 kp，或确认策略动作幅度不会让关节误差超过 1 rad（超过就顶到 23.7 N·m 限幅）。
-
----
-
-## 10. 部署侧发现（**我没有改任何文件**，交 Lead 决定）
-
-| # | 位置 | 现状 | 建议 |
-|---|---|---|---|
-| D1 | `scripts/run_sim.py` | `--soft-feet` 默认 **False** ⇒ 默认用 XML 硬接触（condim 6 / solimp 0.001 / margin 0.001），**与训练 XML 的物理不同**（§5：贡献约 2° 沉降差） | 用策略闭环评测时显式加 `--soft-feet`；或把默认值改成与训练一致 |
-| D2 | `scripts/run_sim.py` | **没有 `--iters`/`--ls-iters` 开关**，`Go2Sim(solver_iterations=...)` 的能力用不上，恒定 100/50 | 暴露这两个参数（`probe_policy_go2.py` 已有 `--iters`） |
-| D3 | `scripts/probe_policy_go2.py` | `--soft-feet` 默认 False | 同上 |
-| D4 | `src/go2_bridge/robot.py::Go2Sim.__init__` | `foot_soft_contact=False` 默认值 + `iterations` 不设 ⇒ 部署默认物理与训练不同 | 见 D1/D2（我没有改） |
-| D5 | `config/go2_sim.json` | `controller.kp=60, kd=5`（stand）与 `policy.kp=20, kd=1` 不同；策略路径取 `policy.*`，✅ 正确 | 无 |
-
-关于真机：`τ=kp·e+kd·ė` 是 500 Hz 电机内部算的，部署 wrapper 只发 `q_des/kp/kd`。真机没有"仿真里的接触参数"这回事，所以 **D1–D4 只影响"用 MuJoCo 评估策略"这一步的保真度**，不影响真机部署代码。
-
----
-
-## 11. 局限与本轮未覆盖
-
-* **MJX warp 求解器 vs CPU Newton 不可直接比较**。本报告全部是 CPU MuJoCo 结论。§5 里"迭代数 2/5"只能说明"在 CPU Newton 里 2 次迭代不收敛"，不能说 MJX 训练也偏。要证伪训练侧求解器的物理性，需要 GPU 上跑 MJX warp（本次按要求未用 GPU）。
-* 未做**真机数据对照**（没有真机日志）。
-* 未扫 `timestep`（两侧都是 0.002）、未扫 `cone/impratio`（两侧都是 elliptic/100）。
-* 训练侧 XML 仍在迭代（15:52 版本）。脚本每次运行都会打印两侧 sha256；文件更新后请复跑 `--mode all`。本报告数字对应 §0 表中那两个 sha256。
-* `kp/kd` 扫描只做了 3×3 网格 + 固定站立；未做随机轨迹下的增益扫描（混沌使该指标无意义）。
+1. CPU Newton（100/50）与 MJX warp（2/5）的接触求解语义不同，地形上的绝对成功率
+   不能逐位对比；同策略同地形的相对排名仍可用于选型。
+2. 观测里的基座线速度在仿真用 oracle、真机用腿式里程计，误差是 sim2real 的第一号风险。
+3. 高度扫描在仿真走 `SimLidar + HeightMapper`（真值 raycast）；真机点云接入前先用
+   `--scan leg_fk` / `nominal`。
+4. 观测与物理的逐段对账只证明"接口一致"，不证明策略本身在真机上一定成功。

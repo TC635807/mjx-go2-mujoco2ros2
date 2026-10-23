@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 BASE=https://raw.githubusercontent.com/unitreerobotics/unitree_mujoco/main/unitree_robots/go2
-DST=/home/tc63/mujoco/mjx-go2-mujoco2ros2/models/go2
+DST=/home/tc63/mujoco/mjx-go2-mujoco2ros2/sim_env/models/go2
 mkdir -p $DST/assets
 for f in go2.xml scene.xml; do
   curl -sSfL -o $DST/$f $BASE/$f && echo "ok $f"

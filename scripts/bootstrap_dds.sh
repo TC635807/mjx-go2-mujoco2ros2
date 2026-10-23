@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 【可选】给 dds 后端（unitree_sdk2py）准备 CycloneDDS。
 #
-# 结论先说（本机实测，详见 docs/backend-notes.md）:
+# 结论先说（本机实测，详见 docs/ros2-setup.md §6）:
 #   * CycloneDDS 的 C 库能编出来；
 #   * 但 cyclonedds 的 **Python 绑定在 Python 3.14 上 import 就崩**
 #     （PEP 649 让它的 IDL 注解机制失效），unitree_sdk2py 因此用不了；

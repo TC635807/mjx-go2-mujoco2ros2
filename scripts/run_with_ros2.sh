@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 用 ROS 2 环境跑本仓库的脚本（rclpy 在 /opt/ros 下，venv 里没有）
 #
-#   scripts/run_with_ros2.sh sim_env/run_sim.py --transport ros2 --duration 30 --viewer
+#   scripts/run_with_ros2.sh sim_env/run_sim.py --target sim_ros --duration 30 --viewer
 #
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

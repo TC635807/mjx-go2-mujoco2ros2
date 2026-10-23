@@ -4,7 +4,7 @@
 这是"先量后改"：移植模型之前，先知道域差有多大，别把"策略本来就不适配"误判成
 "我们的观测/接口搭错了"。
 
-观测按 docs/interfaces.md §1 的 91 维定义构造（height scan 在平地场景上恒为 0）。
+观测按 docs/architecture.md §6 的定义构造（height scan 在平地场景上恒为 0）。
 线速度这里用**仿真真值**（oracle），用来隔离"速度估计误差"这一个变量。
 
     python scripts/probe_policy_go2.py --duration 8
@@ -114,7 +114,7 @@ def main() -> int:
     def build_obs(last_act, phase):
         st = sim.read_state()
         # height scan：平地假设 h_ground = 0。
-        # 注意**不是全 0**：= clip(离地高度 - 0.28, ±0.35) * 5.0，见 docs/interfaces.md §1.2。
+        # 注意**不是全 0**：= clip(离地高度 - 0.28, ±0.35) * 5.0，见 docs/architecture.md §6。
         if args.scan == "oracle":
             zc = float(sim.data.qpos[2])
         else:

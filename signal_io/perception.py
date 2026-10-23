@@ -1,6 +1,6 @@
 """perception.py —— 点云 → 局部高程图 → 35 点机体系高度扫描（仿真 / 真机共用一条管线）。
 
-契约：docs/interfaces.md §6（签名以契约为准）。
+契约：docs/architecture.md §6（签名以契约为准）。
 
     SimLidar (MuJoCo ray-cast)   ─┐
                                   ├─→ HeightMapper.update(points_world, t)

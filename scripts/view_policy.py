@@ -333,7 +333,8 @@ def main() -> int:
         try:
             from sim_env.viz.live import LivePlots, available as _live_ok
             if _live_ok():
-                live = LivePlots(title="go2_bridge  %s / %s" % (args.robot, args.controller))
+                live = LivePlots(title="go2_bridge  %s / %s" % (args.robot, args.controller),
+                                 scan_nx=scan_nx, scan_ny=scan_ny)
                 print("[viz] 曲线/仪表盘 -> 独立窗口 (matplotlib/QtAgg)："
                       "力矩 | 高度倾斜 | 速度 | 高度扫描 | 步态相位 | 动作")
             else:

@@ -1,6 +1,6 @@
 """domain_gap.py —— Go2 训练模型/策略 与 Go2 真机之间的域差清单 + 信号级降级注入。
 
-契约：docs/interfaces.md §7。
+契约：docs/architecture.md。
 
 两部分：
   * GapItem / load_gap_table / format_table —— 可核查的域差清单（数据在 config/domain_gap.json，
