@@ -1,0 +1,56 @@
+# =============================================================================
+# 宇树官方推荐栈（Ubuntu 22.04 + ROS 2 Humble + CycloneDDS 0.10.x）开发容器
+#
+# 用法（在 docker/ 目录）：
+#   docker compose build                      # 构建镜像（需要能访问 GitHub/PyPI 代理）
+#   docker compose run --rm ros2               # 进入交互式容器（/workspace = 本仓）
+#   docker compose run --rm ros2 bash -lc "ros2 topic list"
+#
+# 真机（有线连 Go2）：
+#   UNITREE_NIC=eth1 ROS_DOMAIN_ID=0 docker compose run --rm ros2
+#   （eth1 换成容器里 ip -4 addr 看到的、在 192.168.123.x/24 的网卡名）
+# =============================================================================
+name: unitree-go2-humble
+
+services:
+  ros2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # 构建期走 host 网络：apt/git/pip 需要访问宿主代理（127.0.0.1:7897 之类），
+      # bridge 网络下 127.0.0.1 到不了宿主。没有代理时可删掉这一行。
+      network: host
+      args:
+        # 只有构建期需要（apt/git/pip）；宿主没代理时留空即可
+        # 注意：这三个值不同会改变 Docker 层缓存（ARG 参与 RUN 环境哈希），
+        # 想复用缓存就保持和上次构建一致
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1}
+    image: unitree-go2-ros2:humble
+    container_name: go2-ros2-humble
+
+    # DDS 靠组播自动发现，必须和宿主共用网络命名空间（官方部署的唯一可行方式；
+    # bridge/NAT 网络下收不到机器人的 rt/lowstate，也发不出去 rt/lowcmd）
+    network_mode: host
+
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+
+    volumes:
+      # 本仓根目录（= docker/ 的上一级）挂到 /workspace；容器用户 uid/gid=1000，
+      # 与宿主 tc63 对齐，读写不会产生 root 属主文件
+      - ${GO2_PROJECT:-..}:/workspace
+      # 可选：WSLg / X11（观察器 GUI）。纯 headless 可不挂
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+
+    environment:
+      DISPLAY: ${DISPLAY:-}
+      # 真机：UNITREE_NIC=<有线网卡名>；仿真/回环：lo（默认）
+      UNITREE_NIC: ${UNITREE_NIC:-lo}
+      # 真机固件固定 domain 0；本仓仿真约定 domain 1
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-1}
+      LIBGL_ALWAYS_SOFTWARE: "1"
+
+    command: bash
