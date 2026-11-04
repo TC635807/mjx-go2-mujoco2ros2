@@ -430,6 +430,10 @@ class ControllerNode:
         clock = 0.0          # 逻辑时钟：新鲜状态用 sim_time/tick，断流后按 dt 推进
         n_no_state = 0
         warned_no_state = False
+        # 控制器自己的时间原点（见下面 (5) 的说明）：prepose / ramp 必须用
+        # "接管后过了多久"，不能用机器人上电以来的绝对时间。
+        # 注意不要叫 t_ctrl0：那个名字上面已经用于墙钟原点。
+        clock0: Optional[float] = None
         while n_steps is None or k < n_steps:
             # (1) 取最新状态。recv_state 是非阻塞的：没新消息返回 None（fresh=False）。
             st = self.tr.recv_state()
@@ -469,12 +473,22 @@ class ControllerNode:
                     self.first_level = health_state.level_name
             # (5) 50 Hz 策略推理（decim=10）。50 Hz 之间沿用上一条 LowCmd（零阶保持）。
             if k % self.decim == 0:
-                self._cmd = self.ctrl.update(self._state, now)
+                # 控制器时基 = "接管以来的秒数"，**不是** LowState 的绝对时间。
+                # 为什么：真机 tick 是上电以来的毫秒计数，sim_time 可能是 10^5 s；
+                # StandController 的 kp ramp（t<start_delay→kp=0，再 ramp_s 内升到满）
+                # 和 PolicyController 的 prepose（t<prepose_s 才摆位）都按 t 判断，
+                # 用绝对时间会**直接跳过**：真机一上来就是 kp=60/kd=5 满增益甩到站姿，
+                # 或者跳过 prepose 让策略第一帧看见一个没见过的姿态。
+                # 健康层/安全层仍用绝对 clock（它们的语义是"多久没收到状态"）。
+                if clock0 is None:
+                    clock0 = now
+                t_ctrl = now - clock0
+                self._cmd = self.ctrl.update(self._state, t_ctrl)
                 self._k += 1
                 if self.on_control is not None:
                     try:
                         self.on_control(self._state, self._cmd, self.ctrl,
-                                        health_state, self.supervisor, now)
+                                        health_state, self.supervisor, t_ctrl)
                     except Exception as exc:   # 调试发布不能让控制回路挂掉
                         if self.verbose:
                             print("[ctrl] on_control 异常:", repr(exc)[:160])

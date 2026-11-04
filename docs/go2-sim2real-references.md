@@ -71,8 +71,17 @@
 2. 话题名：ROS 2 侧写 `/rt/lowcmd` → DDS `rt/rt/lowcmd`，收不到。
 3. sport mode：忘记释放（指令被覆盖）或忘记恢复（退出后机器人不会自己站）。
 4. odom 假设：低层控制下机器人自带 odom/sportmodestate 不可用。
-5. 关节顺序：训练（Isaac 顺序）与电机顺序（SDK）不同，必须显式映射
-   （社区常用 `[3,0,9,6,4,1,10,7,5,2,11,8]`）；本项目在 `obs.py`/`config` 已固定。
+5. 关节顺序：**先确认自己的策略顺序**，再决定要不要映射。
+   - 真机 LowCmd 的槽位顺序是硬事实：`0-2=FR`、`3-5=FL`、`6-8=RR`、`9-11=RL`
+     （官方 `unitree_sdk2_python/example/go2/low_level/unitree_legged_const.py` 的 `LegID` 表；
+     `rl_sar` 的 `policy/go2/base.yaml` 里 `joint_mapping` 为恒等，印证同一顺序）。
+   - 乱的是**训练侧**：官方 URDF 的 `<joint>` 声明顺序是 FL,FR,RL,RR，Isaac/legged_gym
+     按 URDF 序建 DOF，所以 `unitree_rl_gym` 体系的策略是 FL 在前的，部署时必须置换，
+     常见写法 `[3,4,5, 0,1,2, 9,10,11, 6,7,8]`（腿级置换）；`[3,0,9,6,4,1,10,7,5,2,11,8]`
+     是"FL/FR/RL/RR 交叉（joint-major）"排布的另一种映射。
+   - **本项目不需要任何置换**：`sim_env/robot.py:MOTOR_JOINTS` 就是 FR,FL,RR,RL，
+     训练/仿真/下发的 `LowCmd` 三处同序（`signal_io/msg.py:25-30`），恒等映射。
+     ⚠ 不要把上面那两张表抄进本仓库，会把腿打乱。
 6. 增益/站姿：`kp/kd`、`default_angles`、`action_scale`、`scan base` 必须来自训练侧；
    本项目 `kp=20/kd=1` 与训练模型 `<position kp=20 kv=1>` 严格等价，**不要改成 0.5**。
 7. 频率/实时性：Python 主循环同时推理 + 发布容易造成指令空档；本项目已把
