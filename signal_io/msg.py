@@ -1,16 +1,61 @@
 """LowCmd / LowState —— 与 unitree_go IDL 字段一一对应的纯 Python 实现。
 
-为什么要自己写一份:
-  * 本机没有 sudo，装不了 ROS 2 / CycloneDDS 系统包; 但框架必须今天就能跑。
-  * 所以消息层不依赖 cyclonedds / rclpy，loopback 与 UDP 后端可以直接用;
-    DDS 后端 (unitree_sdk2py) 和 ROS 2 后端 (unitree_go/msg) 只做一次字段搬运。
+===============================================================================
+1. 为什么自己写一份消息层
+===============================================================================
 
-字段定义严格照抄 unitree_go::msg::dds_::LowCmd_ / LowState_，
-电机槽位 20 个 (Go2 只用前 12 个)，顺序与真机一致:
-    0..2   FR_hip, FR_thigh, FR_calf
-    3..5   FL_hip, FL_thigh, FL_calf
-    6..8   RR_hip, RR_thigh, RR_calf
-    9..11  RL_hip, RL_thigh, RL_calf
+  业务代码（控制器/仿真/测试）不应该依赖 rclpy 或 cyclonedds：
+    * loopback / udp / 测试 可以零中间件直接跑；
+    * ROS 2 后端（transport/ros2.py）与 DDS 后端（transport/dds.py）
+      只在这里和 unitree_go/IDL 对象之间做一次字段搬运；
+    * 同一份 LowCmd/LowState 语义，仿真与真机完全一致。
+
+===============================================================================
+2. 字段与真机的对应
+===============================================================================
+
+  字段严格照抄 unitree_go::msg::dds_::LowCmd_ / LowState_，电机槽位 20 个
+  （Go2 只用前 12 个），顺序与真机一致：
+
+      0..2   FR_hip, FR_thigh, FR_calf
+      3..5   FL_hip, FL_thigh, FL_calf
+      6..8   RR_hip, RR_thigh, RR_calf
+      9..11  RL_hip, RL_thigh, RL_calf
+
+  关节顺序同时是训练侧/策略动作的顺序（MOTOR_JOINTS），不要按 Isaac 顺序重排。
+
+===============================================================================
+3. 两种"报文格式"，别混
+===============================================================================
+
+  (a) 本地传输格式（本文件 LOWCMD_FMT/LOWSTATE_FMT，524/684 字节）
+      loopback / udp 用，字段是"项目自定义的紧凑布局"（含 magic/seq/stamp）。
+      CRC 也只覆盖这个本地布局，用于本地链路自检。
+
+  (b) 真机格式（812 字节 unitree_go IDL 内存布局）
+      真机固件要求的格式；CRC 覆盖 812 字节去末尾 4 字节。
+      实现在 signal_io/go2_crc.py，ROS 2 / DDS 后端下发前调用它。
+
+  WARN: 两种格式的 CRC 不能互换；真机只认 (b)。
+
+===============================================================================
+4. 关键字段语义（真机）
+===============================================================================
+
+  MotorCmd:
+      mode=0x01 FOC/伺服使能（0x00=stop）；q/dq 目标；kp/kd 增益；tau 前馈
+      驱动器自己算 tau_total = kp*(q_des-q) + kd*(dq_des-dq) + tau
+  LowCmd:
+      head=[0xFE,0xEF]  level_flag=0xFF（LOWLEVEL）  crc（812B 布局）
+  LowState:
+      tick（仿真=2ms/步；真机=1ms）  imu_state  motor_state[20]
+      foot_force[4]（FR,FL,RR,RL）  bit_flag（bit0 指令超时/bit7 电机超时）
+
+相关文件：
+  signal_io/go2_crc.py           真机 812 字节布局 + CRC（权威）
+  signal_io/transport/ros2.py    ROS 2 字段搬运 + 真机 CRC
+  signal_io/transport/dds.py     raw DDS 字段搬运（CRC 用 SDK 实现）
+  tests/test_go2_crc.py          812B 布局/CRC 回归
 """
 
 from __future__ import annotations

@@ -1,15 +1,63 @@
 #!/usr/bin/env python3
-"""ROS 2 观察器节点：只订阅话题，不自己拉起仿真/控制器。
+"""ROS 2 观察器节点（go2_viewer）：只订阅话题，不自己拉起仿真/控制器。
 
-这是 view_policy.py 的 ROS 2 版本，用于观察“真实节点图”：
+===============================================================================
+1. 定位
+===============================================================================
 
-    /lowstate              unitree_go/LowState      500 Hz
-    /lowcmd                unitree_go/LowCmd        500 Hz
-    /go2/odom                 nav_msgs/Odometry        > 50 Hz
-    /go2/controller/obs       std_msgs/Float32MultiArray 243 维（--publish-debug）
-    /go2/controller/action    std_msgs/Float32MultiArray 12 维
-    /go2/controller/info      std_msgs/String JSON     健康 / 模式 / 来源
-    /perception/height_scan   std_msgs/Float32MultiArray 187 点
+  这是一个**纯观察者** ROS 2 节点：不控制机器人、不写任何话题、
+  不接触仿真/控制器内部对象。因此仿真与真机共用，切 --target 只改
+  domain/网卡（由 apply_io_env 设置）。
+
+  它把"真实节点图"可视化出来：3D 机器人（运动学回放，不步进物理）、
+  高度扫描热图/3D 扫描点、obs/动作/健康信息、跟踪曲线、CSV 记录。
+
+===============================================================================
+2. 订阅什么
+===============================================================================
+
+  /lowstate              unitree_go/LowState        500 Hz   关节/IMU/足端力
+  /lowcmd                unitree_go/LowCmd          500 Hz   关节目标（q_des）
+  /go2/odom              nav_msgs/Odometry          >50 Hz   位姿/速度（--truth 时当真值）
+  /perception/height_scan std_msgs/Float32MultiArray 15 Hz   187 点高度扫描
+  /go2/controller/obs    std_msgs/Float32MultiArray 50 Hz    243 维观测（--publish-debug）
+  /go2/controller/action std_msgs/Float32MultiArray 50 Hz    12 维策略动作
+  /go2/controller/info   std_msgs/String JSON       10 Hz    健康/模式/来源/统计
+
+===============================================================================
+3. 仿真 / 真机的区别
+===============================================================================
+
+  仿真:
+      /go2/odom 是 MuJoCo 真值；--truth 会把 twist 当速度真值对照（仅仿真有效）。
+      3D 模型用 scene.xml / 指定地形。
+  真机:
+      /lowstate / /lowcmd 直接来自机器人固件 DDS（经 rmw 映射）；
+      /go2/odom 未必存在（很多固件没有），没有时观察器里的位置/速度会缺失；
+      **不要开 --truth**（真机没有 qvel 真值）；
+      3D 模型默认 scene_flat.xml（平地，仅做运动学显示）。
+
+===============================================================================
+4. 线程模型（为什么不会拖慢控制）
+===============================================================================
+
+  rclpy 的 spin 跑在独立线程里，订阅回调只更新缓存；
+  主线程按 --sync-hz 做 3D 渲染、按 --plot-hz 刷新曲线。
+  这样即使 GUI 渲染慢（WSLg/llvmpipe），也不会阻塞 ROS 2 收消息。
+  控制器本身不依赖观察器；关掉观察器不影响控制。
+
+===============================================================================
+5. 常用参数
+===============================================================================
+
+  --headless        无 GUI，只打印终端仪表盘（服务器/SSH 用）
+  --truth           仅仿真：把 odom twist 当速度真值
+  --record DIR      落盘 CSV + summary.png + report.md
+  --scene flat      用 scene_flat.xml（真机/平地）
+  --robot-style lite 只显示碰撞几何（软件渲染提速）
+  --sync-hz/--plot-hz 渲染/曲线刷新频率
+  --follow/--trail  相机跟随/轨迹拖尾
+  --model PATH      覆盖 3D 模型
 
 用法：
     scripts/run_with_ros2.sh scripts/view_ros2.py --target sim_ros

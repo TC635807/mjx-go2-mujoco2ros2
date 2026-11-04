@@ -235,3 +235,48 @@ ros2 launch ros2_ws/launch/real.launch.py controller:=policy viewer:=true
   训练/部署模型足端参数已逐项对齐）。
 - **高度扫描**：`leg_fk` 是"单个标量"，训练侧是逐点；地形上的差异见
   `docs/go2-sim-fidelity.md`。真机建议先平地，再按 §6 接点云。
+
+## 11. 代码阅读路线（真机 ROS 2 部分，按顺序看）
+
+> 注释已按统一结构写：模块 docstring = 职责 / 数据流 / 真机要点 / 失败模式；
+> 类/方法 = 做什么 + 为什么；关键常量/分支都有行内解释。
+
+1. **`config/go2_sim.json`**：先看 `io_profiles`（real_ros 的 domain/网卡/话题/tick_dt/crc_check）、
+   `health_profiles`（真机阈值）、`policy_profiles.go2`（策略档）。
+2. **`signal_io/config.py`**：`load_config()` 怎么把 profile 展开成 cfg["transport"]，
+   `apply_io_env()` 为什么必须在 rclpy.init 之前、网卡 URI 怎么写。
+3. **`signal_io/transport/ros2.py`**：真机通信核心。重点看：
+   ROS 2 名 /lowstate 与 DDS 名 rt/lowstate 的映射；`_on_state` 字段搬运；
+   `_to_ros_cmd` 的固定头 + `_cmd_crc`；`_spin_to_latest` 为什么要抽干队列。
+4. **`signal_io/go2_crc.py`**：真机 812 字节布局与 CRC 覆盖范围（不是 CDR/zlib）。
+5. **`signal_io/node.py`**：`ControllerNode.run` 的 7 步循环、500 Hz/50 Hz 分层、
+   逻辑时钟与断流为什么不能让 health 用冻结的 sim_time、`emergency_stop` 收尾。
+6. **`ros2_controller/run_controller.py`**：进程装配顺序（配置 -> env -> transport ->
+   订阅 scan -> 控制器 -> health/supervisor -> 主循环 -> 阻尼收尾 -> summary）。
+7. **`ros2_controller/health.py` + `safety.py`**：L0..L3 判定与 track/crouch/damping/estop。
+8. **`signal_io/perception_node.py`**：L1 点云坐标系、雷达外参 R/t、无 odom 时为什么
+   不发布高度扫描（控制器回退 leg_fk）。
+9. **`ros2_ws/launch/real.launch.py`**：真机节点图、默认安全参数、perception 何时启动。
+10. **`scripts/go2_real_check.py`**：上机前只读自检，输出怎么读。
+
+**真机启动时序（代码视角）**：
+
+    run_controller.main()
+      load_config(target=real_ros)      # cfg["transport"] = ros2/domain0/eth0//lowcmd...
+      apply_io_env(cfg)                 # ROS_DOMAIN_ID=0, RMW=cyclonedds, CYCLONEDDS_URI
+      make_transport(...)               # rclpy.init + Node + pub/sub
+      HealthMonitor(cfg) / SafetySupervisor(...)
+      ControllerNode.run(duration)
+          每 2ms: recv_state -> health.check -> [每10拍] ctrl.update -> supervisor -> publish_cmd
+      退出: emergency_stop() 发 100ms 阻尼 -> tr.close() -> summary/json
+
+## 12. 注释规范（本项目约定）
+
+- **模块 docstring**：先写"这个文件在系统里的位置/数据流"，再写"真机要点"和
+  "常见失败模式"，最后列相关文件。方便只读一个文件就建立上下文。
+- **类 docstring**：角色 + 生命周期 + 线程模型（如果重要）。
+- **方法/函数 docstring**：一句话职责；参数/返回值/异常用 Args/Returns/Raises；
+  关键实现细节写在 docstring 里（为什么这样做），而不是只说"做了什么"。
+- **行内注释**：只解释"为什么"和"固件/ROS 2 语义"，不复述代码；
+  容易踩的坑用 WARN: 标注，待真机验证的用 TODO(real): 标注。
+- **不写"显而易见"的注释**；优先把契约/时序/单位/坐标系写清楚。

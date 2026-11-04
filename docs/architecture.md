@@ -200,6 +200,7 @@ mjx-go2-mujoco2ros2/
 
 ## 9. 相关文档
 
+- [docs/reading-map.md](reading-map.md) —— **阅读地图**：三条阅读路线、代码级调用链、速查、自检 20 问
 - [README](../README.md) —— 快速开始、策略库、评测结果
 - [docs/ros2-setup.md](ros2-setup.md) —— ROS 2 / CycloneDDS 环境与双进程运行
 - [docs/results.md](results.md) —— 验收结果、性能拆账、后端状态

@@ -29,9 +29,13 @@
 
 <a id="toc"></a>
 
+> 🧭 **第一次读这个仓库？** 先看 [**docs/reading-map.md**](docs/reading-map.md)：
+> 三条阅读路线（快速上手 / 彻底理解实现 / 真机 ROS 2 专项）+ 代码级调用链 +
+> 目录速查 + 读完自检 20 问。
+
 ## 📋 目录
 
-- [亮点](#highlights) · [演示](#demo)
+- [阅读地图](docs/reading-map.md) · [亮点](#highlights) · [演示](#demo)
 - [架构](#architecture)：50 Hz 控制 + 500 Hz 物理
 - [快速开始](#quickstart)：观察器 · 测试 · 验收
 - [策略库](#policies) · [训练-部署一致性](#parity) · [评测结果](#results)
@@ -321,6 +325,12 @@ PROFILE=go2_v25b bash scripts/view_go2_policy.sh            # 回退
 | `real_ros` | `rclpy` + `unitree_go` 消息包 | Go2 真机（ROS 2 话题 `/lowstate` / `/lowcmd`） |
 | `real_sdk` | `unitree_sdk2py` + cyclonedds | Go2 真机（官方 SDK，domain 0 + 有线网卡；Python 3.14 暂不可用） |
 
+> **真机基线建议**：宇树官方只支持 Ubuntu 20.04/22.04 + Foxy/Humble，且机器人固件用 CycloneDDS **0.10.2**；
+> 本机宿主（Ubuntu 26.04 + ROS 2 Lyrical + CycloneDDS 11.0.1 + Python 3.14）不在官方支持范围。
+> 真机 / `sim_sdk` / `real_sdk` 建议用 [`docker/`](docker/README.md) 里的官方推荐栈容器
+> （Ubuntu 22.04 + Humble + CycloneDDS 0.10.x + 官方 SDK，已在容器内验证 ROS 2 与官方 SDK 双向 DDS 互通）。
+> 逐项对照与偏差见 [`docs/unitree-official-sdk-conformance.md`](docs/unitree-official-sdk-conformance.md)。
+
 ```bash
 # ROS 2 节点图（需要本机 ROS 2，见 docs/ros2-setup.md）
 source /opt/ros/<distro>/setup.bash && source ros2_ws/install/setup.bash
@@ -399,8 +409,11 @@ python sim/export_deploy_terrains.py
 
 | 文档 | 内容 |
 |---|---|
+| [`docs/reading-map.md`](docs/reading-map.md) | **阅读地图**：三条阅读路线、代码级调用链、模块依赖、目录/配置/测试速查、自检 20 问 |
 | [`docs/architecture.md`](docs/architecture.md) | **架构总览**：分层、数据流、模块职责、目录结构、IO matrix、扩展点 |
 | [`docs/ros2-setup.md`](docs/ros2-setup.md) | ROS 2 / CycloneDDS 安装、`unitree_go` 构建、双进程运行、真机切换 |
+| [`docs/unitree-official-sdk-conformance.md`](docs/unitree-official-sdk-conformance.md) | **宇树官方 SDK 要求符合性审计**：消息/CRC/话题/时序逐项对照，宿主机（26.04 + Lyrical + CycloneDDS 11 + py3.14）偏差与修复 |
+| [`docker/README.md`](docker/README.md) | **官方推荐栈 Docker 环境**（Ubuntu 22.04 + ROS 2 Humble + CycloneDDS 0.10.x + 官方 SDK）：构建、自检、DDS 互通验证、真机流程 |
 | [`docs/results.md`](docs/results.md) | 测试 / 验收 / 性能拆账 / 后端状态 / 地形评测 |
 | [`docs/go2-train-deploy-parity.md`](docs/go2-train-deploy-parity.md) | 训练 ↔ 部署一致性：执行器、观测/动作、物理参数与残余差异 |
 | [`docs/go2-sim-fidelity.md`](docs/go2-sim-fidelity.md) | 仿真保真度排查记录：帧率、`projected_gravity`、hfield 接触、地形视觉 |

@@ -1,31 +1,61 @@
 #!/usr/bin/env python3
-"""真机 Go2：与仿真**同一张** ROS 2 节点图，只把数据源换成机器人自己。
+"""真机 Go2 launch：与仿真同一张 ROS 2 节点图，只把数据源换成机器人固件。
 
-三层与仿真完全一致：
-    go2_perception   /utlidar/cloud + /utlidar/robot_pose -> /perception/height_scan
-    go2_controller   50 Hz 策略 -> /lowcmd（500 Hz 零阶保持，带真机 CRC）
-    （可选）go2_viewer  只订阅话题
+===============================================================================
+1. 启动了什么（与 sim.launch.py 对照看）
+===============================================================================
 
-真机话题（ROS 2 侧名字，rmw 会映射成 DDS 的 rt/...）：
-    /lowstate              unitree_go/msg/LowState      500 Hz  机器人发
-    /lowcmd                unitree_go/msg/LowCmd        500 Hz  控制器发（含 CRC）
-    /utlidar/cloud         sensor_msgs/PointCloud2      L1 点云，frame=utlidar_lidar（约 11 Hz）
-    /utlidar/robot_pose    geometry_msgs/PoseStamped    **很多固件上没有数据**，不能假设可用
+  真机（本文件）:
+    go2_perception（可选）  /utlidar/cloud + 位姿 -> /perception/height_scan
+    go2_controller         /lowstate + /perception/height_scan -> /lowcmd
+    go2_viewer（可选）     只订阅话题，不参与控制
 
-前提（缺一不可）：
-    1. PC 有线网卡 192.168.123.xxx，ping 192.168.123.161 通；
-    2. 机器人处于 debug 模式（吊起来 → 遥控器 L2+R2，关节阻尼态）；
-    3. ROS_DOMAIN_ID=0，网卡名正确（real_ros profile 的 interface，默认 eth0）；
-    4. 先跑只读自检：
+  机器人固件本身就是一个 ROS 2/DDS 数据源，所以**不需要自己写 lowstate/lowcmd 桥**：
+      ROS 2 话题 /lowstate  <--rmw-->  DDS rt/lowstate  <-- 机器人固件
+      ROS 2 话题 /lowcmd    --rmw-->  DDS rt/lowcmd    --> 机器人固件
+  只有 L1 点云和位姿需要按机器人实际话题配置（下面有默认值）。
+
+===============================================================================
+2. 真机话题（ROS 2 侧名字；rmw_cyclonedds_cpp 会映射成 DDS 的 rt/...）
+===============================================================================
+
+  /lowstate              unitree_go/msg/LowState      500 Hz   机器人 -> PC
+  /lowcmd                unitree_go/msg/LowCmd        500 Hz   PC -> 机器人（含 CRC）
+  /utlidar/cloud         sensor_msgs/PointCloud2      L1 点云，frame=utlidar_lidar，约 11 Hz
+  /utlidar/robot_pose    geometry_msgs/PoseStamped    **很多固件上没有数据**
+  /utlidar/robot_odom    nav_msgs/Odometry            **很多固件上没有数据（厂商建议接 LIO）**
+
+  WARN: 不要以为真机有现成 odom。释放 sport mode 后机器人自带 SportModeState 也不可读，
+        所以真机默认 scan=leg_fk（平地近似），等接上 LIO/EKF 再 scan=topic。
+
+===============================================================================
+3. 上机前（缺一不可）
+===============================================================================
+
+  1) PC 有线网卡 192.168.123.xxx/24，ping 192.168.123.161 通；
+  2) 机器人吊起来，遥控器 L2+R2 进 debug mode（关节阻尼态，释放 sport mode）；
+  3) ROS_DOMAIN_ID=0，网卡名正确（real_ros profile 的 interface，默认 eth0）；
+  4) 先跑只读自检（不发任何指令）：
        scripts/run_with_ros2.sh scripts/go2_real_check.py --target real_ros --duration 5
 
-安全默认：controller=stand、scan=leg_fk（不做地形感知；等 odom/EKF 可靠后再 scan:=topic）。
-用法：
-    ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=zero duration:=10
-    ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=stand duration:=15
-    ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=policy duration:=30
-    # 已确认 /utlidar/robot_pose 有数据、且外参标定过，才开真感知：
-    ... controller:=policy scan:=topic perception:=true
+===============================================================================
+4. 启动顺序（安全默认）
+===============================================================================
+
+  本 launch 默认 controller=stand、scan=leg_fk —— 不做地形感知、只走站姿 PD。
+  真机首次上机请手动按顺序：
+      zero  （吊起，确认 /lowstate 和电机伺服）
+      stand （仍吊起/空旷，看关节平滑到站姿）
+      policy（落地，先 --cmd 0.2 0 0）
+
+  用法：
+      ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=zero duration:=10
+      ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=stand duration:=15
+      ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=policy duration:=30
+      # 已确认位姿有数据 + L1 外参标定过，才开真感知：
+      ... controller:=policy scan:=topic perception:=true lidar_rpy:="0 2.8782 0"
+
+  退出：controller 退出 -> 整体退出；controller 在真机上会先发 100 ms 阻尼再停。
 """
 
 from __future__ import annotations
@@ -41,6 +71,7 @@ RUN_WITH_ROS2 = str(ROOT / "scripts" / "run_with_ros2.sh")
 
 
 def _launch(context):  # noqa: ANN001
+    """按参数拼装真机节点（controller 必须起；perception/viewer 可选）。"""
     lc = context.launch_configurations
     duration = str(lc.get("duration", "30.0"))
     target = str(lc.get("target", "real_ros"))
@@ -56,15 +87,19 @@ def _launch(context):  # noqa: ANN001
 
     if target == "real_sdk":
         # 本机 Python 3.14 下 unitree_sdk2py 不可用；且 --scan topic 只支持 ros2 传输。
+        # 显式警告 + 回退，避免用户以为在跑 SDK 路径。
         print("[launch] ⚠ target=real_sdk 当前不可用（unitree_sdk2py/cyclonedds 在 Python 3.14 "
               "不可用，见 docs/ros2-setup.md §8）；强制改用 real_ros + scan=leg_fk")
         target, scan, perception = "real_ros", "leg_fk", "false"
 
+    # perception 默认 auto：只有 scan=topic 时才启动（否则它收不到位姿也只会空转）。
     want_perception = perception in ("1", "true", "yes", "on") or \
         (perception == "auto" and scan == "topic")
 
     actions = []
     if want_perception:
+        # ---- 可选节点 1：感知（L1 点云 -> 187 点 height_scan）----
+        # 需要真机有 /utlidar/cloud 且有可用位姿；外参用 --lidar-mount/--lidar-rpy 覆盖。
         perc_cmd = ["bash", RUN_WITH_ROS2, "signal_io/perception_node.py",
                     "--target", target, "--points-frame", points_frame,
                     "--points-topic", points_topic, "--odom-topic", odom_topic,
@@ -81,15 +116,21 @@ def _launch(context):  # noqa: ANN001
     else:
         print("[launch] 不启动 go2_perception（scan=%s）；控制器用 leg_fk 高度扫描" % scan)
 
+    # ---- 节点 2（必须）：控制器（50 Hz 策略 + 500 Hz 下发 + CRC + 安全层）----
+    # --linvel estimator：真机没有可信的仿真真值，只能走腿式里程计。
+    # --publish-debug：给观察器提供 obs/action/info。
     actions.append(ExecuteProcess(
         cmd=["bash", RUN_WITH_ROS2, "ros2_controller/run_controller.py",
              "--target", target, "--controller", controller,
              "--policy-profile", policy_profile, "--scan", scan,
              "--linvel", "estimator", "--publish-debug", "--duration", duration],
         output="screen", emulate_tty=True, name="go2_controller",
+        # controller 退出（duration 到点 / Ctrl-C / 异常）就整体退出；
+        # 它在 finally 里会先发 100 ms 阻尼，然后才真正退出。
         on_exit=[Shutdown(reason="controller exited")],
     ))
     if viewer:
+        # ---- 可选节点 3：观察器（只订阅话题，真机不要开 --truth）----
         actions.append(ExecuteProcess(
             cmd=["bash", RUN_WITH_ROS2, "scripts/view_ros2.py",
                  "--target", target, "--scene", "flat", "--duration", duration],
@@ -118,7 +159,7 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("points_frame", default_value="lidar",
                               description="点云坐标系：lidar（真机 L1）/ body / world"),
         DeclareLaunchArgument("odom_topic", default_value="/utlidar/robot_pose",
-                              description="里程计话题（很多固件上没有数据；可用 /utlidar/robot_odom 或外部 EKF）"),
+                              description="位姿话题（很多固件没有数据；可换 /utlidar/robot_odom 或外部 EKF）"),
         DeclareLaunchArgument("odom_type", default_value="pose",
                               description="pose（PoseStamped）或 odom（Odometry）"),
         DeclareLaunchArgument("lidar_mount", default_value="",

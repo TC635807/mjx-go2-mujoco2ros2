@@ -1,27 +1,69 @@
-"""分级健康监控（接口契约 §4）。
+"""分级健康监控：把 LowState/附加通道聚合成 L0..L3，供安全监督器决策。
 
-统一信息输入层：每路信息带 {value, stamp, valid, sigma}，聚合成四级健康状态：
+===============================================================================
+1. 它解决什么问题
+===============================================================================
 
-    L0 正常  -> 全部在容差内
-    L1 降级  -> 非致命缺失（可选通道丢失 / 单帧抖动），任务降级
-    L2 保护  -> 关键传感器不可信（看门狗级超时 / IMU 无效 / sigma 超限）
-    L3 急停  -> 致命（LowState 完全没来 / 姿态超限 / 关节角 NaN），**锁存**
+  真机上最危险的失效不是"控制算错"，而是"信息不可信"：网线掉了、DDS 断流、
+  IMU 出 NaN、电机丢包/过温、机器人自己报了指令超时……这些情况下继续按旧指令
+  跑 500 Hz 会非常危险。HealthMonitor 只做一件事：判断"信息够不够、可不可信"，
+  输出一个等级；具体下发什么交给 SafetySupervisor。
 
-规则（全部可由 cfg 覆盖，默认值见 DEFAULT_HEALTH_CFG）：
-  * L3: LowState 年龄 > estop_ms；或 |roll|/|pitch| > max_tilt_deg；或关节角 NaN
-  * L2: LowState 年龄 > protect_ms；或 IMU 无效 / NaN；或任一通道 sigma > sigma_max
-  * L1: 可选通道无效；或 LowState 年龄 > stale_ms（单帧抖动）；或 sigma > sigma_warn；
-        或 confidence_channel 的值 < confidence_min
-  * L0: 以上都不触发
+  L0 正常  -> 全部在容差内
+  L1 降级  -> 非致命（可选通道丢失 / 单帧抖动 / 电机偏热），任务降级
+  L2 保护  -> 关键信息不可信（看门狗级超时 / IMU 无效 / 电机丢包过温 / 机器人报指令超时）
+  L3 急停  -> 致命（LowState 完全没来 / 姿态超限 / 关节角 NaN），**锁存**
 
-迟滞：
+===============================================================================
+2. 判定规则（阈值全部可由 cfg["health"] 覆盖）
+===============================================================================
+
+  LowState 年龄（由 ControllerNode 的逻辑时钟驱动）：
+      > stale_ms        -> L1（单帧抖动）
+      > protect_ms      -> L2（看门狗级超时）
+      > estop_ms        -> L3（完全没数据）
+  内容：
+      关节角 q12 NaN/长度不对        -> L3
+      IMU rpy 缺失/NaN               -> L2
+      |roll| 或 |pitch| > max_tilt_deg -> L3
+      电机 lost[i] != 0              -> L2（真机）
+      电机温度 >= temp_max_c         -> L2（真机；>= temp_warn_c -> L1）
+      LowState.bit_flag bit0         -> L2（机器人报"操作指令超时"）
+      LowState.bit_flag bit7         -> L2（机器人报"电机超时"）
+  附加通道（cmd_vel / height_scan / linvel_conf）：
+      无效 -> L1（可选通道）；sigma > sigma_max -> L2；置信度低 -> L1
+
+  WARN: 真机断流时 ControllerNode 给 check() 传的是 None（不是旧 state），
+        否则每拍都会刷新 _state_stamp，state_age 恒 0，L2/L3 永远不触发。
+        逻辑时钟也在 ControllerNode 里按墙钟推进（见 signal_io/node.py §4）。
+
+===============================================================================
+3. 迟滞与锁存
+===============================================================================
+
   * 升级立即生效；
-  * 降级必须连续 recover_s 满足**低一级**的条件才回落一级（逐级回落）。
-L3 锁存：一旦进入 L3，除非调用 reset()，check() 永远返回 L3。
+  * 降级必须连续 recover_s 满足**低一级**的条件才回落一级（逐级回落），
+    避免在阈值附近抖动；
+  * L3 一旦进入就锁存，除非显式 reset()。
 
-cfg 允许两种形态：
-  HealthMonitor(cfg=loaded_config)     # 自动取 cfg["health"] 子段
-  HealthMonitor(cfg={"estop_ms": ...}) # 直接就是 health 段
+===============================================================================
+4. 真机 / 仿真阈值差异
+===============================================================================
+
+  config/go2_sim.json 的 health_profiles 按 target 覆盖：
+      real_ros / real_sdk: stale 40 ms / protect 80 ms / estop 250 ms
+      （真机 DDS 偶发抖动比仿真大；20 ms 太紧，一次调度抖动就会 L1 下蹲）
+  仿真沿用 health 段默认值，保持测试可复现。
+
+  cfg 允许两种形态：
+      HealthMonitor(cfg=loaded_config)     # 自动取 cfg["health"] 子段
+      HealthMonitor(cfg={"estop_ms": ...}) # 直接就是 health 段
+
+相关文件：
+  signal_io/node.py               ControllerNode.run（时钟 + 断流传 None）
+  ros2_controller/safety.py       根据等级决定 track/crouch/damping/estop
+  config/go2_sim.json             health / health_profiles
+  tests/test_health.py            65 项阈值/迟滞/锁存测试
 """
 
 from __future__ import annotations
@@ -272,6 +314,9 @@ class HealthMonitor:
                     hits.append((Level.L3_ESTOP, "tilt=%.1fdeg>%.1f" % (tilt_deg, self.max_tilt_deg)))
 
             # --- 真机才有的电机健康信号（仿真里 lost=0 / temperature=0 / bit_flag=0）
+            # lost   : 电机通信丢失（官方 Basic_services）；任一电机丢 = L2
+            # temp   : 电机温度（int8，摄氏度）；>= temp_warn_c -> L1，>= temp_max_c -> L2
+            # bit_flag: 机器人自己报的异常位；bit0=操作指令超时、bit7=电机超时 -> L2
             if self.check_motor_health:
                 lost = [i for i in range(NUM_JOINT)
                         if int(getattr(state.motor_state[i], "lost", 0))]
