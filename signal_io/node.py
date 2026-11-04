@@ -372,6 +372,8 @@ class ControllerNode:
         self.level_hist: Dict[str, int] = {}
         self.mode_hist: Dict[str, int] = {}
         self.first_level = None
+        # 只提示一次的诊断：命令 mode=0x01 但机器人电机没进伺服（运控没释放的典型症状）
+        self._mode_warned = False
 
     def _damping_cmd(self) -> LowCmd:
         """全关节阻尼指令（kp=0, kd=8），真机退出/急停收尾用。
@@ -500,6 +502,20 @@ class ControllerNode:
             # (7) 500 Hz 下发：真机后端在这里写固定头 + CRC（transport/ros2.py）。
             self.tr.publish_cmd(cmd)
             self.n_cmd += 1
+            # (7.5) 一次性诊断："发了很多拍 mode=0x01，但机器人电机 mode 还是 0"。
+            # 这是"忘按 L2+R2 释放运控 / CRC 被丢 / 话题名错"最常见、也最容易被误判成
+            # "代码没跑通"的症状：机器人在阻尼态下对你的指令毫无反应。
+            if not self._mode_warned and self.n_cmd > 500 and self._state is not None:
+                try:
+                    modes = [int(self._state.motor_state[i].mode) for i in range(NUM_JOINT)]
+                except Exception:      # 字段缺失（老消息）就不提示
+                    modes = []
+                if modes and all(m == 0 for m in modes):
+                    print("[ctrl] ⚠ 已下发 mode=0x01 约 1 s，但机器人 12 个电机的 "
+                          "motor_state.mode 仍全是 0：运控没释放（遥控器 L2+R2 或 "
+                          "docker/scripts/release_sport_mode.py --yes）或指令被固件丢弃"
+                          "（CRC/话题名/网段）")
+                    self._mode_warned = True
             pacer.tick()
             k += 1
         # ---- summary：排障时先看 n_state/n_cmd、health.level_hist、transport.bad_crc

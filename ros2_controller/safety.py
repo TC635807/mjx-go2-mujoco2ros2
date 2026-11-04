@@ -117,7 +117,7 @@ class SafetySupervisor:
     def __init__(self, stand_pose, limits=None, ramp_rate: float = 200.0,
                  mode_kp: float = 20.0, mode_kd: float = 1.0,
                  crouch_depth: float = 0.35, crouch_s: float = 2.0,
-                 enabled: bool = True):
+                 damping_kd: Optional[float] = None, enabled: bool = True):
         self.stand_pose = np.asarray(stand_pose, dtype=np.float64).reshape(-1).copy()
         if self.stand_pose.size != NUM_JOINT:
             raise ValueError("stand_pose 必须是 %d 维，得到 %d" % (NUM_JOINT, self.stand_pose.size))
@@ -125,6 +125,10 @@ class SafetySupervisor:
         self.ramp_rate = float(ramp_rate)
         self.mode_kp = float(mode_kp)
         self.mode_kd = float(mode_kd)
+        # L2「阻尼」档的 kd 单独给：crouch(L1) 用 mode_kd（kp=20/kd=1 软 PD 下蹲），
+        # 真正掉数据后的 damping(L2) 要"抱住腿"，kd 太小会直接软塌下去。
+        # 默认 = mode_kd（保持旧行为），真机配置里给 8（与官方 Damp()/退出收尾同量级）。
+        self.damping_kd = float(damping_kd) if damping_kd is not None else float(mode_kd)
         self.crouch_depth = float(crouch_depth)
         self.crouch_s = float(crouch_s)
         self.enabled = bool(enabled)
@@ -252,7 +256,7 @@ class SafetySupervisor:
         if q is None:
             q = self._qdes.copy()
             self._n_damping_no_state += 1
-        cmd = self._pd_cmd(q, 0.0, self.mode_kd)
+        cmd = self._pd_cmd(q, 0.0, self.damping_kd)
         safe, _timed_out = self.limiter.process(cmd, dt=dt)
         return safe
 

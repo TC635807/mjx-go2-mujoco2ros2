@@ -465,7 +465,8 @@ def main() -> int:
         supervisor = SafetySupervisor(
             sim.stand_pose, limits=sim.torque_limits, ramp_rate=cfg.get("ramp_rate", 200.0),
             mode_kp=float(s.get("mode_kp", 20.0)), mode_kd=float(s.get("mode_kd", 1.0)),
-            crouch_depth=float(s.get("crouch_depth", 0.35)), crouch_s=float(s.get("crouch_s", 2.0)))
+            crouch_depth=float(s.get("crouch_depth", 0.35)), crouch_s=float(s.get("crouch_s", 2.0)),
+            damping_kd=float(s.get("damping_kd", 8.0)))
         if s.get("l2_policy"):
             supervisor.l2_policy = str(s["l2_policy"])
 
