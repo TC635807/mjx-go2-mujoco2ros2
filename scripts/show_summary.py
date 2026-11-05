@@ -56,10 +56,13 @@ def render(path):
         n = pol.get("n_calls") or 0
         k = pol.get("n_action_clamped") or 0
         r = pct(k, n)
-        tag = "   <-- 越界严重：观测不在训练分布" if r > 20 else "   (正常)"
         out.append("")
         out.append("策略    %s   n_calls=%d" % (pol.get("policy"), n))
-        out.append("        动作被夹紧 %d/%d = %.2f%%%s" % (k, n, r, tag))
+        out.append("        动作被夹紧 %d/%d = %.2f%%" % (k, n, r))
+        # 2026-11-05 实测：仿真里同一策略同样是 100%（886/886），说明这个数
+        # 天生就会饱和（action scale + 默认姿态一直撞关节限位），单看它没有意义，
+        # 只能拿不同运行之间做相对比较。别再用它判断"观测是否在训练分布"。
+        out.append("                   （提示：仿真基线也是 ~100%，此数单独看无意义，只做运行间相对比较）")
         out.append("        动作幅值   mean=%.3f max=%.3f   obs_valid=%s"
                    % (pol.get("action_abs_mean") or 0.0, pol.get("action_abs_max") or 0.0,
                       pol.get("obs_valid")))
