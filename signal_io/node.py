@@ -385,8 +385,6 @@ class ControllerNode:
         self.level_hist: Dict[str, int] = {}
         self.mode_hist: Dict[str, int] = {}
         self.first_level = None
-        # 只提示一次的诊断：命令 mode=0x01 但机器人电机没进伺服（运控没释放的典型症状）
-        self._mode_warned = False
 
     def _damping_cmd(self) -> LowCmd:
         """全关节阻尼指令（kp=0, kd=8），真机退出/急停收尾用。
@@ -447,8 +445,6 @@ class ControllerNode:
         clock = 0.0          # 逻辑时钟：新鲜状态用 sim_time/tick，断流后按 dt 推进
         n_no_state = 0
         warned_no_state = False
-        # 控制器自己的时间原点见上面的 (3.5)（t_ctrl_origin）：prepose / ramp 必须用
-        # "接管后过了多久"，不能用机器人上电以来的绝对时间。
         while n_steps is None or k < n_steps:
             # 拍间隔统计：500 Hz 的"停顿"是真机风险（停顿期间没有新指令，固件行为未知）。
             _t_iter = time.perf_counter()
@@ -498,7 +494,6 @@ class ControllerNode:
                     self.first_level = health_state.level_name
             # (5) 50 Hz 策略推理（decim=10）。50 Hz 之间沿用上一条 LowCmd（零阶保持）。
             if k % self.decim == 0:
-                # 控制器时基（接管以来的秒数）在更上面的 (3.5) 已经算好：t_ctrl_origin。
                 self._cmd = self.ctrl.update(self._state, t_ctrl)
                 self._k += 1
                 if self.on_control is not None:
@@ -523,20 +518,6 @@ class ControllerNode:
                 if self.n_publish_err <= 3 or self.n_publish_err % 200 == 0:
                     print("[ctrl] ⚠ publish_cmd 异常 x%d: %r" % (self.n_publish_err, exc))
             self.n_cmd += 1
-            # (7.5) 一次性诊断："发了很多拍 mode=0x01，但机器人电机 mode 还是 0"。
-            # 这是"忘按 L2+R2 释放运控 / CRC 被丢 / 话题名错"最常见、也最容易被误判成
-            # "代码没跑通"的症状：机器人在阻尼态下对你的指令毫无反应。
-            if not self._mode_warned and self.n_cmd > 500 and self._state is not None:
-                try:
-                    modes = [int(self._state.motor_state[i].mode) for i in range(NUM_JOINT)]
-                except Exception:      # 字段缺失（老消息）就不提示
-                    modes = []
-                if modes and all(m == 0 for m in modes):
-                    print("[ctrl] ⚠ 已下发 mode=0x01 约 1 s，但机器人 12 个电机的 "
-                          "motor_state.mode 仍全是 0：运控没释放（遥控器 L2+R2 或 "
-                          "docker/scripts/release_sport_mode.py --yes）或指令被固件丢弃"
-                          "（CRC/话题名/网段）")
-                    self._mode_warned = True
             pacer.tick()
             # (8) 现场可视：每 1 s 打一行进度。真机上一跑 60 s，如果什么都不打印，
             #     操作员没法判断"指令流活没活、健康等级掉没掉"，而"先把流跑稳、再去切

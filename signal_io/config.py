@@ -317,10 +317,6 @@ def load_config(path: str | None = None, overrides: Dict[str, Any] | None = None
             _env_overrides["domain_id"] = "GO2_DOMAIN_ID"
         except ValueError:
             pass
-    # 网卡名容错：真机档默认 "eth0"，但实际机器/容器里常叫 enp0s31f6 之类。
-    # 网卡名不存在时 CycloneDDS 静默收不到 /lowstate，上机现场极难排查，所以先纠正。
-    if io.get("name") in ("ros2", "dds"):
-        io["interface"] = resolve_interface(str(io.get("interface") or ""), tgt)
     cfg["transport"] = io
     cfg["_env_overrides"] = _env_overrides
     cfg["watchdog_ms"] = float(io.get("watchdog_ms", 60.0))
@@ -359,84 +355,6 @@ def load_config(path: str | None = None, overrides: Dict[str, Any] | None = None
         if _key in trb:
             cfg["_train_%s" % _key] = trb[_key]
     return cfg
-
-
-# ================================================================ 真机网卡容错
-#: Go2 底盘内部网段（官方文档：PC 侧 192.168.123.x/24，机器人 192.168.123.161）
-DOG_SUBNET = "192.168."
-
-
-def _iface_exists(iface: str) -> bool:
-    """网卡是否真的存在（Linux /sys/class/net；其它平台退化为 True 不做判断）。"""
-    if not iface:
-        return False
-    if not os.path.isdir("/sys/class/net"):
-        return True
-    return os.path.isdir("/sys/class/net/%s" % iface)
-
-
-def _iface_ipv4(iface: str) -> Optional[str]:
-    """读网卡 IPv4（只依赖标准库；失败返回 None）。"""
-    try:
-        import fcntl
-        import socket
-        import struct
-    except ImportError:      # 非 Linux
-        return None
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        req = struct.pack("256s", iface[:15].encode())
-        return socket.inet_ntoa(fcntl.ioctl(s.fileno(), 0x8915, req)[20:24])
-    except OSError:
-        return None
-    finally:
-        s.close()
-
-
-def _list_ifaces() -> List[str]:
-    try:
-        return sorted(os.listdir("/sys/class/net"))
-    except OSError:
-        return []
-
-
-def resolve_interface(iface: str, target: str = "") -> str:
-    """真机档的网卡名容错：配置里的 eth0 在实际机器上可能叫 enp0s31f6。
-
-    为什么需要：真机档默认 interface="eth0"（官方例程的写法）。但在
-    "docker --network host" 的容器里，看到的是**宿主机**的网卡名；
-    CycloneDDS 拿到一个不存在的网卡名时不会报错，只是收不到机器人的
-    /lowstate —— 表现为"话题列表空、什么都连不上"，非常难查。
-
-    策略（保守、只在名字确实不存在时才动）：
-      1) 网卡存在 -> 原样返回（不做任何猜测）；
-      2) 不存在，但恰有一个网卡带 192.168.123.x 地址 -> 自动改用它并打印；
-      3) 都没有 -> 原样返回，并打印本机网卡清单提示用 GO2_INTERFACE 指定。
-    """
-    if not iface:
-        return iface
-    if _iface_exists(iface):
-        return iface
-    if not target.startswith("real"):
-        return iface
-    cands = []
-    for name in _list_ifaces():
-        ip = _iface_ipv4(name)
-        if not ip:
-            continue
-        if ip.startswith(DOG_SUBNET + "123."):
-            cands.append((name, ip))
-    if len(cands) == 1:
-        name, ip = cands[0]
-        print("[config] ⚠ 配置的网卡 %r 不存在；自动改用持有机器人网段地址的 %r（%s）"
-              % (iface, name, ip))
-        return name
-    print("[config] ⚠ 配置的网卡 %r 在本机不存在（真机 DDS 会连不上机器人）。"
-          % iface)
-    print("[config]   本机网卡：%s" % (", ".join(_list_ifaces()) or "<读不到>"))
-    print("[config]   请用 GO2_INTERFACE=<接狗的有线网卡> 或 --target 对应的 interface 指定；"
-          "该网卡应已配好 192.168.123.x/24 且能 ping 通 192.168.123.161")
-    return iface
 
 
 def io_summary(cfg: Dict[str, Any]) -> str:
