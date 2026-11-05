@@ -805,6 +805,20 @@ def main() -> int:
             pass
 
     # ------------------------------------------------------------ 11) summary
+    # 实时性自检：真机上最容易被忽视、又最能毁掉策略表现的就是"跑不满 500 Hz"。
+    # 2026-11-05 实测过一段 rtf=0.75、lag_p95=16 s、overruns=63.7% 的运行——
+    # 那种数据拿去判断策略好坏毫无意义，所以这里主动吼一声。
+    _pac = summary.get("pacer") or {}
+    _steps = _pac.get("steps") or 0
+    _ov = _pac.get("overruns") or 0
+    _rtf = _pac.get("rtf")
+    if _steps and _ov / _steps > 0.10:
+        print("[ctrl] ⚠ 实时性不达标：overruns %d/%d = %.1f%%（>10%%）。"
+              % (_ov, _steps, 100.0 * _ov / _steps))
+        print("[ctrl]    这段数据不能用来评价策略：先关掉浏览器/桌面特效/其它容器，重跑一次。")
+    if _rtf is not None and _rtf < 0.98:
+        print("[ctrl] ⚠ pacer.rtf = %.2f < 0.98：墙钟 60 s 只跑出 %.1f s 仿真时间"
+              % (_rtf, (_pac.get("sim_s") or 0.0)))
     if summary.get("n_state", 0) == 0:
         print("[ctrl] ⚠ 整个运行期没有收到任何 /lowstate：检查网线 / 网段 / ROS_DOMAIN_ID / "
               "CYCLONEDDS_URI 网卡 / 话题名（应为 /lowstate）")
