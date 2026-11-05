@@ -437,6 +437,7 @@ class ControllerNode:
         """
         n_steps = None if duration <= 0 else int(round(duration / self.dt))
         pacer = Pacer(self.dt, enabled=realtime)
+        self._pacer = pacer        # Ctrl-C 中断时 summary() 还要用它
         t_ctrl0 = time.monotonic()
         t_ctrl_origin = None   # 本地时基起点：首次拿到状态时的 clock（见模块 docstring §4）
         health_state = None
@@ -539,19 +540,35 @@ class ControllerNode:
                           flush=True)
             k += 1
         # ---- summary：排障时先看 n_state/n_cmd、health.level_hist、transport.bad_crc
-        out = {"pacer": pacer.stats(), "n_state": self.n_state, "n_cmd": self.n_cmd,
-               "n_publish_err": self.n_publish_err,
-               "max_loop_gap_ms": round(self.max_loop_gap * 1e3, 3),
-               "n_no_state": n_no_state, "ever_state": self._state is not None,
-               "control_ticks": self._k, "controller": self.ctrl.stats(),
-               "transport": self.tr.stats()}
+        self._n_no_state = n_no_state
+        return self.summary()
+
+    def summary(self, interrupted: bool = False) -> Dict[str, object]:
+        """组装 summary（正常结束与 Ctrl-C 中断共用）。
+
+        为什么单独抽出来（2026-11-05 实机踩过）：以前 run() 里直接拼 dict，
+        KeyboardInterrupt 一抛，调用方只能写 {"interrupted": true} —— 摔倒/急停
+        那一刻的 level_hist / overruns / 速度 / 姿态全部丢失，事后无法归因。
+        现在中断也能拿到同一份统计（只多一个 interrupted 标记）。
+        """
+        pacer = getattr(self, "_pacer", None)
+        out: Dict[str, object] = {
+            "pacer": pacer.stats() if pacer is not None else {},
+            "n_state": self.n_state, "n_cmd": self.n_cmd,
+            "n_publish_err": self.n_publish_err,
+            "max_loop_gap_ms": round(self.max_loop_gap * 1e3, 3),
+            "n_no_state": getattr(self, "_n_no_state", 0),
+            "ever_state": self._state is not None,
+            "control_ticks": self._k, "controller": self.ctrl.stats(),
+            "transport": self.tr.stats()}
+        if interrupted:
+            out["interrupted"] = True
         if self.health is not None:
             out["health"] = self.health.stats()
             out["level_hist"] = dict(sorted(self.level_hist.items()))
             out["first_level"] = self.first_level
         if self.supervisor is not None:
-            sup = self.supervisor.stats()
-            out["safety_supervisor"] = sup
+            out["safety_supervisor"] = self.supervisor.stats()
             out["mode_hist"] = dict(sorted(self.mode_hist.items()))
             out["final_mode"] = self.supervisor.mode
             out["final_level"] = self.supervisor.level.name

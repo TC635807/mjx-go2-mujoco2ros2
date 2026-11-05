@@ -789,7 +789,14 @@ def main() -> int:
     try:
         summary = node.run(args.duration, realtime=not args.no_realtime)
     except KeyboardInterrupt:
-        summary = {"interrupted": True}
+        # 中断也要落盘：以前这里只写 {"interrupted": true}，摔倒/急停那一刻的
+        # level_hist / overruns / 速度 / 姿态全部丢光，事后无法归因（2026-11-05 踩过）。
+        try:
+            summary = node.summary(interrupted=True)
+            print("[ctrl] Ctrl-C：已保存中断摘要（level_hist/overruns/controller 统计都在）")
+        except Exception as exc:  # noqa: BLE001 - 摘要失败不能掩盖退出
+            print("[ctrl] 中断摘要失败：", repr(exc)[:160])
+            summary = {"interrupted": True}
     finally:
         # 真机退出收尾：先发一段阻尼再断流。官方没有公开「lowcmd 断流后固件怎么处理」，
         # 主动阻尼比「保持最后一条策略指令」安全。
