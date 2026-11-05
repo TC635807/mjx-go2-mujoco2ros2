@@ -91,12 +91,22 @@ def main() -> int:
                     help="IO profile（决定 domain / 网卡；默认真机）")
     ap.add_argument("--topic", default="/go2/cmd_vel", help="话题名（别写 rt/ 前缀）")
     ap.add_argument("--rate", type=float, default=10.0, help="发布频率 Hz（默认 10）")
+    ap.add_argument("--limits", type=float, nargs=6, default=None,
+                    metavar=("VXMIN", "VXMAX", "VYMIN", "VYMAX", "WZMIN", "WZMAX"),
+                    help="覆盖限幅；默认=训练分布 -0.2 0.8 -0.3 0.3 -0.8 0.8")
     ap.add_argument("--duration", type=float, default=20.0,
                     help="持续时长 秒（0 = 直到 Ctrl-C）")
     ap.add_argument("--once", action="store_true", help="只发一条就退出")
     ap.add_argument("--keys", action="store_true",
                     help="交互模式：w/s 前后 ±0.05、a/d 转向 ±0.2、空格归零、q 退出")
     args = ap.parse_args()
+
+    global CLIP_LO, CLIP_HI
+    if args.limits is not None:
+        _v = [float(x) for x in args.limits]
+        CLIP_LO = np.array([min(_v[0], _v[1]), min(_v[2], _v[3]), min(_v[4], _v[5])])
+        CLIP_HI = np.array([max(_v[0], _v[1]), max(_v[2], _v[3]), max(_v[4], _v[5])])
+        print("[cmd_vel] 限幅被覆盖为 lo=%s hi=%s" % (CLIP_LO.tolist(), CLIP_HI.tolist()))
 
     cmd = clip_cmd(args.cmd or [0.0, 0.0, 0.0])
     if tuple(np.asarray(args.cmd or [0, 0, 0], dtype=np.float64)) != tuple(cmd):

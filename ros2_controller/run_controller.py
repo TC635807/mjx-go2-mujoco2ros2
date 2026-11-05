@@ -118,18 +118,23 @@ UNSAFE_FLAGS = (
 )
 
 
-# 运行期 cmd_vel 的安全限幅 (vx, vy, wz)：真机首测不接受 2 m/s 这种输入。
-# 上界给的是"平地首测够快但撞了也还能救"的量级；要更快请改这里，别在终端硬发。
-CMD_VEL_LIMITS = ((-0.2, 0.8), (-0.3, 0.3), (-0.8, 0.8))
+# 训练时的命令分布：策略只见过这个范围。**这就是"安全限幅"的由来**。
+# 超出它策略不会跟踪（它没见过），所以默认夹在这里。
+TRAIN_CMD_LIMITS = ((-0.2, 0.8), (-0.3, 0.3), (-0.8, 0.8))
+
+# 运行期实际生效的限幅。默认 = 训练分布；可用 --cmd-limits 覆盖（会打印警告）。
+CMD_VEL_LIMITS = TRAIN_CMD_LIMITS
 
 
-def clip_cmd_vel(vx: float, vy: float, wz: float) -> tuple:
-    """把 cmd_vel 三轴夹到首测安全范围，返回 (vx, vy, wz)。
+def clip_cmd_vel(vx: float, vy: float, wz: float, limits=None) -> tuple:
+    """把 cmd_vel 三轴夹到限幅范围，返回 (vx, vy, wz)。
 
     为什么在**回调里**就夹、而不是等策略：/go2/cmd_vel 是给人手敲的（ros2 topic pub），
     一个多余的 0 就能让机器人跑出去；夹在这里，越界的输入永远进不了观测。
+
+    limits 默认 = 训练分布（TRAIN_CMD_LIMITS）；真机上想放宽用 --cmd-limits。
     """
-    (x0, x1), (y0, y1), (z0, z1) = CMD_VEL_LIMITS
+    (x0, x1), (y0, y1), (z0, z1) = limits if limits is not None else CMD_VEL_LIMITS
     return (float(np.clip(vx, x0, x1)), float(np.clip(vy, y0, y1)),
             float(np.clip(wz, z0, z1)))
 
@@ -517,6 +522,9 @@ def main() -> int:
     ap.add_argument("--remote-gain", type=float, nargs=3, default=[0.8, -0.3, -0.8],
                     metavar=("VX", "VY", "WZ"),
                     help="满杆 vx/vy/wz；vy/wz 取负：体坐标 +y=左、+wz=左转，摇杆右为正")
+    ap.add_argument("--cmd-limits", type=float, nargs=6, default=None,
+                    metavar=("VXMIN", "VXMAX", "VYMIN", "VYMAX", "WZMIN", "WZMAX"),
+                    help="覆盖速度指令限幅；默认=训练分布，超出会打警告")
     ap.add_argument("--remote-estop-keys", default="L2+B",
                     help="按住此组合键 = 纯阻尼急停（默认 L2+B，与 mcf 软急停一致）；空=关闭")
     ap.add_argument("--remote-estop-kd", type=float, default=8.0,
@@ -533,6 +541,14 @@ def main() -> int:
     ap.add_argument("--policy-profile", default=None,
                     help="策略档：auto（默认，按 --robot 选）/ go2 / go2_v33d / go2_v29c ...")
     args = ap.parse_args()
+
+    # 速度指令限幅：默认训练分布；--cmd-limits 6 个数可覆盖（vxmin vxmax vymin vymax wzmin wzmax）
+    cmd_limits = TRAIN_CMD_LIMITS
+    if args.cmd_limits is not None:
+        _v = [float(x) for x in args.cmd_limits]
+        cmd_limits = ((min(_v[0], _v[1]), max(_v[0], _v[1])),
+                      (min(_v[2], _v[3]), max(_v[2], _v[3])),
+                      (min(_v[4], _v[5]), max(_v[4], _v[5])))
 
     # ------------------------------------------------------------ 2) 配置 + scan 来源
     cfg = load_config(args.config, target=args.target,
@@ -643,7 +659,8 @@ def main() -> int:
 
             def _on_twist(m, _lc=live):     # noqa: ANN001 - ROS 回调
                 # 三轴限幅是安全护栏（见 clip_cmd_vel）：越界输入永远进不了观测。
-                _lc.set_command(clip_cmd_vel(m.linear.x, m.linear.y, m.angular.z))
+                _lc.set_command(clip_cmd_vel(m.linear.x, m.linear.y, m.angular.z,
+                                             limits=cmd_limits))
 
             tr.create_subscription(Twist, args.cmd_topic, _on_twist)
 
@@ -685,16 +702,26 @@ def main() -> int:
                         if abs(v) < args.remote_deadzone:
                             v = 0.0
                         out.append(v * _gain[i])
-                    _lc.set_command(clip_cmd_vel(out[0], out[1], out[2]))
+                    _lc.set_command(clip_cmd_vel(out[0], out[1], out[2],
+                                                 limits=cmd_limits))
 
                 tr.create_subscription(WirelessController, args.remote_topic,
                                        _on_remote, qos_profile_sensor_data)
                 print("[ctrl] 遥控器     = %s（映射 %s，满杆 %s，死区 %.2f，静默 %.1f s 回零，L1=归零）"
                       % (args.remote_topic, args.remote_map, _gain,
                          args.remote_deadzone, args.remote_timeout))
-            print("[ctrl] 运行期速度 = %s（vx[-0.2,0.8] vy[-0.3,0.3] wz[-0.8,0.8]；"
+            _wider = any(cmd_limits[i][0] < TRAIN_CMD_LIMITS[i][0] - 1e-9
+                         or cmd_limits[i][1] > TRAIN_CMD_LIMITS[i][1] + 1e-9
+                         for i in range(3))
+            if _wider:
+                print("[ctrl] [!] 速度限幅超出训练分布：vx%s vy%s wz%s（训练是 vx%s vy%s wz%s）"
+                      % (cmd_limits[0], cmd_limits[1], cmd_limits[2],
+                         TRAIN_CMD_LIMITS[0], TRAIN_CMD_LIMITS[1], TRAIN_CMD_LIMITS[2]))
+                print("[ctrl] [!] 策略没见过这个速度范围，可能不跟踪甚至失稳；先小步试（0.4 起步），别直接给满")
+            print("[ctrl] 运行期速度 = %s（vx%s vy%s wz%s；"
                   "失联 %.1f s 回零；启动初值仍取 --cmd/配置）"
-                  % (args.cmd_topic, args.cmd_timeout))
+                  % (args.cmd_topic, cmd_limits[0], cmd_limits[1], cmd_limits[2],
+                     args.cmd_timeout))
             if str(cfg["target"]).startswith("real_") and args.cmd_timeout <= 0.0:
                 print("[ctrl] ⚠ 真机上关掉了 cmd_vel 失联回零（--cmd-timeout<=0）："
                       "话题静默后机器人会继续按最后一条速度走。首测不要这么跑。")
