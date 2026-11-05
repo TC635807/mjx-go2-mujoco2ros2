@@ -30,6 +30,17 @@
       电机温度 >= temp_max_c         -> L2（真机；>= temp_warn_c -> L1）
       LowState.bit_flag bit0         -> L2（机器人报"操作指令超时"）
       LowState.bit_flag bit7         -> L2（机器人报"电机超时"）
+  可选检查（**默认关闭**，cfg 的 health 段里显式打开才生效）：
+      check_battery + v_warn/v_min   -> power_v <= v_min -> L2；<= v_warn -> L1
+                                        **缺字段就 SKIP（不判定），绝不当作"正常"**
+      max_joint_vel（>0 才开）       -> 任一 |dq| 超限 -> L2；dq 是 NaN -> L2
+
+  WARN 电池：真机 transport 现在**没有搬** LowState.power_v
+        （signal_io/transport/ros2.py 的 _on_state 只搬 tick/imu/motor/foot/bit_flag），
+        所以 getattr(state, "power_v", None) 恒为 None -> check_battery 恒 SKIP。
+        这不是把问题藏起来，而是**真机低电压无保护**这个缺口的诚实表达；
+        补法见 docs/safety-audit.md 的"未修缺口"一节（给 LowState 加字段 + 在
+        _on_state 里搬 m.power_v；注意不要动 msg.py 的 pack/unpack UDP 布局）。
   附加通道（cmd_vel / height_scan / linvel_conf）：
       无效 -> L1（可选通道）；sigma > sigma_max -> L2；置信度低 -> L1
 
@@ -109,6 +120,17 @@ DEFAULT_HEALTH_CFG: Dict[str, object] = {
     "temp_warn_c": 70.0,          # 电机温度 >= 此值 -> L1
     "temp_max_c": 85.0,           # 电机温度 >= 此值 -> L2
     "check_bit_flag": True,       # LowState.bit_flag: bit0 指令超时 / bit7 电机超时 -> L2
+    "bit_flag_grace_s": 0.30,     # bit0/bit7 必须「连续」置位多久才判 L2（去抖）
+    # --- 可选检查：默认关闭（打开前先读 docs/safety-audit.md 的残留风险）---
+    # 电池：LowState.power_v（Go2 是 8S 锂电，满电 ~33.6 V / 标称 29.6 V / 空 ~24 V）。
+    # 注意 v_warn/v_min 是**待真机标定**的经验值：Go2 满电 33.6 V 掉到 26 V 已经很低，
+    # 具体按明天实测的电压曲线再调；宁可先松（只在真正低电压时才触发）。
+    "check_battery": False,       # True 才检查；真机 transport 目前不搬 power_v -> 恒 SKIP
+    "v_warn": 26.0,               # power_v <= 此值 -> L1（降级：蹲下/收指令）
+    "v_min": 24.0,                # power_v <= 此值 -> L2（保护：阻尼）
+    # 关节速度异常：0 = 关闭。Go2 关节额定转速约 30 rad/s，
+    # 40 rad/s 只可能是"编码器/状态链路坏了"，不要用它抓正常高频抖动。
+    "max_joint_vel": 0.0,         # >0 才检查；任一 |dq| 超限 -> L2
 }
 
 
@@ -178,6 +200,29 @@ class HealthMonitor:
         self.temp_warn_c = float(self.cfg.get("temp_warn_c", 70.0))
         self.temp_max_c = float(self.cfg.get("temp_max_c", 85.0))
         self.check_bit_flag = bool(self.cfg.get("check_bit_flag", True))
+        # 去抖窗口。2026-11-05 实机踩过：bit0（操作指令超时）在我们第一帧 LowCmd
+        # 到达之前就会置位，旧逻辑看到一帧就判 L2，监督器随即 crouch，迟滞阶梯要
+        # 2 s 才爬回 L0 -> 真机上就是「一启动就四脚往里收、站不住」。
+        # 改成连续置位超过 grace 才报警：真断流时仍会在 300 ms 内升级。
+        self.bit_flag_grace_s = float(self.cfg.get("bit_flag_grace_s", 0.30))
+        self._bf0_since = None
+        self._bf7_since = None
+        # 可选检查（默认关闭，见 DEFAULT_HEALTH_CFG 的注释）
+        self.check_battery = bool(self.cfg.get("check_battery", False))
+        self.v_warn = float(self.cfg.get("v_warn", 26.0))
+        self.v_min = float(self.cfg.get("v_min", 24.0))
+        self.max_joint_vel = float(self.cfg.get("max_joint_vel", 0.0) or 0.0)
+        # motor_state[i].lost 是**累计丢包计数**（不是当前状态）：一旦历史上抖动过
+        # 一次就永远 >0。2026-11-05 实机踩过：RL_thigh 累计 lost=5，q/dq/温度全正常，
+        # 旧逻辑把它判成 L2 -> 监督器 crouch->damping -> 狗四脚往里收，永远站不住。
+        # 所以这里改成看"窗口内新增速率"和"自基线累计"，而不是绝对值。
+        self.lost_win_s = float(self.cfg.get("lost_win_s", 1.0))
+        self.lost_win_max = int(self.cfg.get("lost_win_max", 5))
+        self.lost_total_max = int(self.cfg.get("lost_total_max", 50))
+        self._lost_base = None      # 首次样本的累计值（基线）
+        self._lost_win = None       # 当前 1 s 窗口起点的累计值
+        self._lost_win_t = None
+        self._lost_events = 0       # 统计：因 lost 判过几次
 
         self._clear(0.0)
         self._initialized = False   # 首次 check() 自动把时基对齐到 now
@@ -199,6 +244,11 @@ class HealthMonitor:
         self._dwell: Dict[Level, float] = {lvl: 0.0 for lvl in Level}
         self._reasons: Tuple[str, ...] = ()
         self._channels: Dict[str, Channel] = {}
+        # 可选检查的统计：SKIP 与 PASS 必须能分开看，否则"没数据"会被误读成"正常"。
+        self._n_battery_checked = 0
+        self._n_battery_skip = 0
+        self._v_now: Optional[float] = None
+        self._n_vel_hits = 0
 
     def reset(self, now: float = 0.0) -> None:
         """清掉锁存与全部统计，把时基设到 now。"""
@@ -237,6 +287,50 @@ class HealthMonitor:
                 return Level.L1_DEGRADED, "%s:stale=%.1fms" % (name, ch.age_s * 1e3)
             return Level.L2_PROTECT, "%s:stale=%.1fms" % (name, ch.age_s * 1e3)
         return Level.L0_NORMAL, ""
+
+    # ------------------------------------------------------------ 可选检查（默认关）
+    def _battery_hit(self, state: LowState, hits: List[Tuple[Level, str]]) -> None:
+        """电池电压检查（cfg["health"]["check_battery"]=True 才调用）。
+
+        SKIP 语义：拿不到 / 字段无效（None / 非有限 / <=0）时**不做判定**，只计数。
+        "没数据"和"电池正常"必须分开 —— 把前者当后者就是这次审计要避免的假安全感。
+        当前真机 transport 没搬 power_v，所以这里恒 SKIP（见模块 docstring 的 WARN）。
+        """
+        v = getattr(state, "power_v", None)
+        try:
+            v = None if v is None else float(v)
+        except (TypeError, ValueError):
+            v = None
+        if v is None or not np.isfinite(v) or v <= 0.0:
+            self._n_battery_skip += 1
+            return
+        self._n_battery_checked += 1
+        self._v_now = v
+        if v <= self.v_min:
+            hits.append((Level.L2_PROTECT, "battery=%.2fV<=%.2f" % (v, self.v_min)))
+        elif v <= self.v_warn:
+            hits.append((Level.L1_DEGRADED, "battery=%.2fV<=%.2f" % (v, self.v_warn)))
+
+    def _joint_vel_hit(self, state: LowState, hits: List[Tuple[Level, str]]) -> None:
+        """关节速度异常检查（cfg["health"]["max_joint_vel"] > 0 才调用）。
+
+        |dq| > max_joint_vel -> L2；dq 出现 NaN -> L2（同一路信息已经不可信）。
+        正常步行 Go2 关节 |dq| 约 0~15 rad/s，所以阈值要明显高于它（建议 40+）。
+        """
+        try:
+            arr = _as_float(state.dq12())
+        except (AttributeError, TypeError, ValueError):
+            return                      # 拿不到 dq12：不判定（关节角坏了会走 joint_nan）
+        if arr is None or arr.size != NUM_JOINT:
+            return
+        if not _finite(arr):
+            hits.append((Level.L2_PROTECT, "joint_dq_nan"))
+            return
+        vmax = float(np.max(np.abs(arr)))
+        if vmax > self.max_joint_vel:
+            self._n_vel_hits += 1
+            hits.append((Level.L2_PROTECT,
+                         "joint_vel=%.1frad/s>%.1f" % (vmax, self.max_joint_vel)))
 
     # ---------------------------------------------------------------- 主入口
     def check(self, state: Optional[LowState], now: float, *,
@@ -313,15 +407,44 @@ class HealthMonitor:
                 if tilt_deg > self.max_tilt_deg:
                     hits.append((Level.L3_ESTOP, "tilt=%.1fdeg>%.1f" % (tilt_deg, self.max_tilt_deg)))
 
+            # --- 可选检查（默认关闭；打开后也不改变 L0 路径的任何行为）
+            if self.check_battery:
+                self._battery_hit(state, hits)
+            if self.max_joint_vel > 0.0:
+                self._joint_vel_hit(state, hits)
+
             # --- 真机才有的电机健康信号（仿真里 lost=0 / temperature=0 / bit_flag=0）
             # lost   : 电机通信丢失（官方 Basic_services）；任一电机丢 = L2
             # temp   : 电机温度（int8，摄氏度）；>= temp_warn_c -> L1，>= temp_max_c -> L2
             # bit_flag: 机器人自己报的异常位；bit0=操作指令超时、bit7=电机超时 -> L2
             if self.check_motor_health:
-                lost = [i for i in range(NUM_JOINT)
-                        if int(getattr(state.motor_state[i], "lost", 0))]
-                if lost:
-                    hits.append((Level.L2_PROTECT, "motor_lost=%s" % lost[:6]))
+                lost_now = [int(getattr(state.motor_state[i], "lost", 0))
+                            for i in range(NUM_JOINT)]
+                # 固件重启/计数器回绕 -> 重新取基线
+                if self._lost_base is None or any(
+                        lost_now[i] < self._lost_base[i] for i in range(NUM_JOINT)):
+                    self._lost_base = list(lost_now)
+                if self._lost_win is None or self._lost_win_t is None:
+                    self._lost_win = list(lost_now)
+                    self._lost_win_t = now
+                # 每 lost_win_s 评估一次：窗口内新增 >= lost_win_max 才算"现在在丢"
+                if now - float(self._lost_win_t) >= self.lost_win_s:
+                    d_win = [lost_now[i] - self._lost_win[i] for i in range(NUM_JOINT)]
+                    d_tot = [lost_now[i] - self._lost_base[i] for i in range(NUM_JOINT)]
+                    hot_win = [i for i in range(NUM_JOINT) if d_win[i] >= self.lost_win_max]
+                    hot_tot = [i for i in range(NUM_JOINT) if d_tot[i] >= self.lost_total_max]
+                    if hot_win:
+                        self._lost_events += 1
+                        hits.append((Level.L2_PROTECT,
+                                     "motor_lost_rate=%s(+%d/%.1fs)"
+                                     % (hot_win[:6], self.lost_win_max, self.lost_win_s)))
+                    elif hot_tot:
+                        self._lost_events += 1
+                        hits.append((Level.L2_PROTECT,
+                                     "motor_lost_total=%s(>=%d)"
+                                     % (hot_tot[:6], self.lost_total_max)))
+                    self._lost_win = list(lost_now)
+                    self._lost_win_t = now
                 temps = [int(getattr(state.motor_state[i], "temperature", 0))
                          for i in range(NUM_JOINT)]
                 tmax = max(temps) if temps else 0
@@ -333,11 +456,25 @@ class HealthMonitor:
                                  "motor_temp=%dC>=%.0f" % (tmax, self.temp_warn_c)))
             if self.check_bit_flag:
                 bf = int(getattr(state, "bit_flag", 0)) & 0xFF
+                # 去抖：bit0/bit7 必须连续置位超过 bit_flag_grace_s 才算真故障
                 if bf & 0x01:
-                    # 机器人自己报"操作指令超时"：说明我们的 lowcmd 没按预期到达
-                    hits.append((Level.L2_PROTECT, "robot_cmd_timeout(bit_flag=0x%02X)" % bf))
+                    if self._bf0_since is None:
+                        self._bf0_since = now
+                    elif now - self._bf0_since >= self.bit_flag_grace_s:
+                        hits.append((Level.L2_PROTECT,
+                                     "robot_cmd_timeout(bit_flag=0x%02X,%.0fms)"
+                                     % (bf, (now - self._bf0_since) * 1e3)))
+                else:
+                    self._bf0_since = None
                 if bf & 0x80:
-                    hits.append((Level.L2_PROTECT, "motor_timeout(bit_flag=0x%02X)" % bf))
+                    if self._bf7_since is None:
+                        self._bf7_since = now
+                    elif now - self._bf7_since >= self.bit_flag_grace_s:
+                        hits.append((Level.L2_PROTECT,
+                                     "motor_timeout(bit_flag=0x%02X,%.0fms)"
+                                     % (bf, (now - self._bf7_since) * 1e3)))
+                else:
+                    self._bf7_since = None
         channels["state"] = Channel(name="state", value=q12, stamp=self._state_stamp,
                                     valid=state_ok, sigma=0.0, age_s=state_age)
 
@@ -423,5 +560,12 @@ class HealthMonitor:
             "state_age_s": float(state_ch.age_s) if state_ch is not None else None,
             "channels": sorted(self._channels),
             "optional_channels": sorted(self.optional_channels),
+            # 可选检查：battery.n_checked/n_skipped 是"判定过 / 跳过"的分开计数
+            "battery": {"enabled": self.check_battery, "v_warn": self.v_warn,
+                        "v_min": self.v_min, "last_v": self._v_now,
+                        "n_checked": self._n_battery_checked,
+                        "n_skipped": self._n_battery_skip},
+            "max_joint_vel": self.max_joint_vel,
+            "n_joint_vel_hits": self._n_vel_hits,
             "cfg": {k: (list(v) if isinstance(v, (tuple, list)) else v) for k, v in self.cfg.items()},
         }

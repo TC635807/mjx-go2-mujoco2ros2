@@ -25,6 +25,7 @@
 # 另外三块是 tau·高度·速度曲线、17x11 高度热图、243 维 obs 分段条、健康等级 HUD。
 set -euo pipefail
 cd "$(dirname "$0")/.."
+ROOT="$(pwd)"
 
 # 单线程 BLAS 必须钉死: 1024-512 策略前向在默认 OpenBLAS 线程数下实测 12 ms/次(并占满 12~16 核),
 # 单线程 0.21 ms/次。50 Hz 控制预算 20 ms —— 多线程小矩阵纯属浪费, 实测把观察器 RTF 从 1.0 压到 0.3。
@@ -73,4 +74,7 @@ else
 fi
 echo
 
-exec /home/tc63/mujoco/.venv/bin/python scripts/view_policy.py "${ARGS[@]}" "${EXTRA[@]}"
+# Python：宿主机默认 .venv，容器/机载电脑用 GO2_PYTHON（/opt/venv），都没有就退到 python3。
+PY="${GO2_PYTHON:-$ROOT/.venv/bin/python}"
+if [ ! -x "$PY" ]; then PY="$(command -v python3 || true)"; fi
+exec "$PY" "$ROOT/scripts/view_policy.py" "${ARGS[@]}" "${EXTRA[@]}"

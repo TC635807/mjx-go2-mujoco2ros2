@@ -9,6 +9,16 @@
 > 上机前请按 §3 的只读自检脚本逐项确认。调研来源见
 > [docs/go2-sim2real-references.md](../docs/go2-sim2real-references.md)。
 
+> **上机当天先看这三份**（比本文件更"当天可执行"）：
+> 1. [`docs/sim2real-day0.md`](../docs/sim2real-day0.md) —— 作战手册：时间线、每步命令、期望值、失败判据、6 个必看指标；
+> 2. [`docs/safety-audit.md`](../docs/safety-audit.md) —— 疯车/力矩/断链/失控的失效→保护→缺口，以及今天落了什么；
+> 3. [`docs/real-bringup.md`](../docs/real-bringup.md) —— 现场 runbook（含官方栈容器一节）。
+
+> 工具链（今天新增，都在 `scripts/`）：`env_check.py`（环境体检，有 FAIL 别动电机）、
+> `real_sensor_check.py`（25 项传感器只读自检，**不发布任何 LowCmd**）、
+> `real_run.sh`（preflight→zero→stand→policy 分阶段，带确认与时长上限）、
+> `cmd_vel.py`（运行期改速度，不用重启控制器）、`failsafe_guard.py`（独立进程兜"控制器死了没人阻尼"，默认只观察不真发）。
+
 ## 0. 一页结论
 
 1. **不需要自己写 lowstate/lowcmd 的 hardware bridge。** 机器人固件就在 DDS 上收发
@@ -85,7 +95,11 @@ export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces>
 ### 3.2 只读自检（不发送任何指令）
 
 ```bash
-source /opt/ros/lyrical/setup.bash
+# 新版（推荐）：25 项判定 + PASS/WARN/FAIL 表 + --json，只订阅不发布
+bash scripts/run_with_ros2.sh scripts/real_sensor_check.py --target real_ros --duration 5
+
+# 旧版（仍然可用）：
+source /opt/ros/<distro>/setup.bash      # 或 ROS_SETUP=/opt/ros/humble/setup.bash
 source ros2_ws/install/setup.bash
 export PYTHONPATH=$PYTHONPATH:/usr/lib/python3/dist-packages ROS_DOMAIN_ID=0
 

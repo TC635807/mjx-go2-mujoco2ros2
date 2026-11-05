@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import abc
+import time
 from typing import Callable, Optional, Sequence
 
 import numpy as np
@@ -30,6 +31,12 @@ class BaseController(abc.ABC):
         return {}
 
 
+# unitree_go/WirelessController.keys 的位图（2026-11-05 实机标定：L2=bit5、R2=bit4）
+BUTTON_BITS = {"R1": 0, "L1": 1, "start": 2, "select": 3, "R2": 4, "L2": 5,
+               "F1": 6, "F2": 7, "A": 8, "B": 9, "X": 10, "Y": 11,
+               "up": 12, "right": 13, "down": 14, "left": 15}
+
+
 class ZeroController(BaseController):
     """纯卸力：motor_cmd 全 0。用来确认链路通了但机器人会趴下。"""
 
@@ -37,6 +44,75 @@ class ZeroController(BaseController):
 
     def update(self, state: Optional[LowState], t: float) -> LowCmd:
         return LowCmd().zero()
+
+
+class DampController(BaseController):
+    """纯关节阻尼：mode=1 / kp=0 / kd=<kd> / q=dq=tau=0。
+
+    为什么需要它（2026-11-05 实机）：Go2 待机时固件自己会发一条 kp=0/kd=3 的
+    "兜底阻尼"（软急停/趴姿保持）。要确认"我们的 LowCmd 到底能不能接管电机"，
+    最安全的办法不是发位置环（stand，可能抖），而是**只改阻尼系数**：
+      kd=8 时关节明显比 kd=3 更"黏"，但没有任何位置环 -> 不可能产生动作。
+    手感一变，就证明控制权在我们手里。
+    """
+
+    name = "damp"
+
+    def __init__(self, kd: float = 8.0):
+        self.kd = float(kd)
+        self._cmd = make_stand_cmd(np.zeros(12, dtype=np.float64), 0.0, self.kd)
+
+    def update(self, state: Optional[LowState], t: float) -> LowCmd:
+        # 每拍重建：make_stand_cmd 会把 q/dq/tau 清零并写 kp/kd，改 kd 立即生效
+        self._cmd = make_stand_cmd(np.zeros(12, dtype=np.float64), 0.0, self.kd)
+        return self._cmd
+
+    def stats(self) -> dict:
+        return {"kd": self.kd, "kp": 0.0}
+
+
+class KeyGateController(BaseController):
+    """按键阻尼闸：遥控器某个组合键按住时，直接输出纯阻尼（kp=0/kd=8）。
+
+    为什么需要（2026-11-05 实机）：`L2+B` 这条"软急停"是 `mcf` 的功能，
+    一旦用 `--release-mode` 把 mcf 释放掉，它就失效了 —— 而那一刻机器人正好
+    只受我们控制，等于把唯一的硬急停弄丢了。
+    所以这里用同一个组合键（默认 L2+B）在我们自己的控制环里实现同样的效果：
+    按住 -> 立刻 kp=0/kd=8 纯阻尼；松开 -> 交回内层控制器。
+    """
+
+    name = "key_gate"
+
+    def __init__(self, inner: "BaseController", kd: float = 8.0):
+        self.inner = inner
+        self.kd = float(kd)
+        self.active = False
+        self.n_estop = 0
+        self.name = "%s+estop" % getattr(inner, "name", "ctrl")
+
+    def set_estop(self, on: bool) -> None:
+        on = bool(on)
+        if on and not self.active:
+            self.n_estop += 1
+        self.active = on
+
+    def set_command(self, cmd) -> None:
+        setter = getattr(self.inner, "set_command", None)
+        if callable(setter):
+            setter(cmd)
+
+    def update(self, state: Optional[LowState], t: float) -> LowCmd:
+        if self.active:
+            return make_stand_cmd(np.zeros(12, dtype=np.float64), 0.0, self.kd)
+        return self.inner.update(state, t)
+
+    def stats(self) -> dict:
+        return {"inner": self.inner.stats(), "estop_active": self.active,
+                "n_estop": self.n_estop, "estop_kd": self.kd}
+
+
+class KeyGatePlaceholder:
+    pass
 
 
 class StandController(BaseController):
@@ -74,6 +150,79 @@ class StandController(BaseController):
 
     def stats(self) -> dict:
         return {"kp_alpha": round(self._alpha, 3)}
+
+
+class LiveCommandController(BaseController):
+    """给任意控制器套一层"运行期速度指令 + 失联回零"（真机用）。
+
+    背景：真机首测希望「起立站住 -> 落地 -> 再前进」，改速度不该重启进程。
+    cmd_vel 话题来的指令交给 set_command()；话题静默超过 timeout_s 就自动回零速
+    （原地踏步）并打印一次告警 —— 操作员终端挂了，不该让狗一直往前走。
+
+    只做转发，不碰安全层：限幅/看门狗仍在 SafetySupervisor 与健康层。
+    """
+
+    name = "live_command"
+
+    def __init__(self, inner: BaseController, timeout_s: float = 3.0,
+                 zero=(0.0, 0.0, 0.0), verbose: bool = True):
+        self.inner = inner
+        self.name = getattr(inner, "name", "controller")
+        self.timeout_s = float(timeout_s)
+        self.zero = tuple(float(x) for x in zero)
+        self.verbose = bool(verbose)
+        self._last_rx = None       # 最近一次收到 cmd_vel 的 monotonic 时刻
+        self._ever = False
+        self._timed_out = False
+        self.n_sets = 0
+        self.n_timeouts = 0
+        self.last_cmd = None
+
+    # -- 供 ROS 回调调用 -----------------------------------------------------
+    def set_command(self, cmd, now: Optional[float] = None) -> None:
+        """记下一条外部指令（时间用 monotonic，与 update 的 t 无关）。"""
+        self._last_rx = time.monotonic() if now is None else float(now)
+        self._ever = True
+        self._timed_out = False
+        self.n_sets += 1
+        self.last_cmd = tuple(float(x) for x in np.asarray(cmd, dtype=np.float64).reshape(-1))
+        setter = getattr(self.inner, "set_command", None)
+        if callable(setter):
+            setter(self.last_cmd)
+
+    def _decay_if_stale(self) -> None:
+        if not self._ever or self.timeout_s <= 0.0 or self._timed_out:
+            return
+        if time.monotonic() - float(self._last_rx) <= self.timeout_s:
+            return
+        self._timed_out = True
+        self.n_timeouts += 1
+        setter = getattr(self.inner, "set_command", None)
+        if callable(setter):
+            setter(self.zero)
+        if self.verbose:
+            print("[ctrl] ⚠ cmd_vel 超过 %.1f s 没更新 -> 速度指令回零（原地踏步）"
+                  % self.timeout_s)
+
+    # -- BaseController 接口 -------------------------------------------------
+    def update(self, state: Optional[LowState], t: float) -> LowCmd:
+        self._decay_if_stale()
+        return self.inner.update(state, t)
+
+    def reset(self) -> None:
+        resetter = getattr(self.inner, "reset", None)
+        if callable(resetter):
+            resetter()
+
+    def stats(self) -> dict:
+        try:
+            out = dict(self.inner.stats() or {})
+        except Exception:      # noqa: BLE001 - 统计不能让控制回路挂掉
+            out = {}
+        out["live_cmd"] = {"n_sets": self.n_sets, "n_timeouts": self.n_timeouts,
+                           "timeout_s": self.timeout_s, "last_cmd": self.last_cmd,
+                           "timed_out": self._timed_out}
+        return out
 
 
 class WbcLqrStub(BaseController):
@@ -200,6 +349,25 @@ class PolicyController(BaseController):
         self._n_bad_scan = 0
         self._scan_missing_since = None
         self._warned_scan_missing = False
+
+    # ------------------------------------------------------------------ 运行期指令
+    def set_command(self, cmd) -> np.ndarray:
+        """运行期改速度指令（obs 9:12），不需要重启控制器。
+
+        真机首测的正确节奏：--cmd 0 0 0 起立站住 -> 落地 -> 再给 0.2 m/s。
+        重启进程会让机器人在"卸力 -> 预摆位"之间塌一下，能避免就避免。
+
+        Returns:
+            生效后的 (3,) 数组。
+        """
+        v = np.asarray(cmd, dtype=np.float64).reshape(-1)
+        if v.size != 3 or not bool(np.all(np.isfinite(v))):
+            raise ValueError("command 必须是 3 维有限值，得到 %r" % (v.tolist(),))
+        self.command = v.copy()
+        setter = getattr(self.obs, "set_command", None)
+        if callable(setter):
+            setter(v)
+        return self.command.copy()
 
     # ------------------------------------------------------------------ 速度 / 离地高度
     def _linvel(self, state: LowState, t: float) -> Optional[np.ndarray]:

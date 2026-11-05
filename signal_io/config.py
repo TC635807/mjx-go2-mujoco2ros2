@@ -43,7 +43,8 @@
   target=real_ros：
       name=ros2            走 rclpy + rmw_cyclonedds_cpp
       domain_id=0          机器人固件固定 domain 0（仿真用 1，别串台）
-      interface=eth0       连机器人的有线网卡（必须改成本机实际网卡名）
+      interface=eth0       连机器人的有线网卡；**通常不必改文件**，用环境变量
+                           GO2_IFACE 覆盖即可（见 §6；上机脚本会自动探测并 export）
       cmd_topic=/lowcmd    ROS 2 话题名（不要写 rt/；rmw 会补）
       state_topic=/lowstate
       tick_dt=0.001        真机 LowState.tick 按 1 ms 递增
@@ -80,7 +81,32 @@
   * 能发 /lowcmd 但机器人不动：CRC / sport mode（L2+R2 debug mode）/
     电机 mode 三项，见 real_env/README.md。
   * 仿真和真机同时开：domain 必须分开（仿真 1 / 真机 0），否则话题串台。
-  * 改网卡名只改 config 里的 interface 即可，环境变量由 apply_io_env 生成。
+  * 改网卡名：优先用 GO2_IFACE（不改文件，见 §6），其次改 config 里的
+    io_profiles.real_ros.interface；ROS 侧环境变量由 apply_io_env 生成。
+
+===============================================================================
+6. 网卡 / domain 的环境变量覆盖（GO2_IFACE）+ 自动探测 detect_iface()
+===============================================================================
+
+  为什么要有这一层：config/go2_sim.json 里 real_ros.interface 写的是 "eth0"，
+  而现场的机器可能是 enp3s0 / enp0s31f6 / 容器里的 eth0@if12 —— 每台机器都不一样。
+  上机最怕「改配置文件改错一处、忘了改回来」，所以支持不改文件的覆盖：
+
+      GO2_IFACE=enp3s0       覆盖 io profile 的 interface（推荐；T3 新增）
+      GO2_INTERFACE=enp3s0   旧名，继续支持（docker/ 里已在用）；两者都给以 GO2_IFACE 为准
+      GO2_DOMAIN_ID=0        覆盖 domain_id（一般不用改：真机 0 / 仿真 1）
+
+  覆盖发生在「选中 io_profile 展开成 cfg["transport"] 之后、CLI overrides 之前」，
+  所以命令行仍然有最高优先级；被覆盖的字段名记在 cfg["_env_overrides"]，
+  io_summary() 会打印 "[env 覆盖: interface<-GO2_IFACE]"，现场一眼能看出用的是哪张网卡。
+
+  detect_iface()：从 ip -br addr 的输出里挑「最像连机器人的那条有线链路」——
+      1) UP 且 IPv4 落在 192.168.123.0/24（PC 直连 Go2 的典型形态）
+      2) UP 且不是 lo、不是无线（名字不以 wl / wlan 开头）
+      3) 都不是 -> None（**不猜**，调用方保留 config 默认值并告警）
+  它是纯只读的辅助函数，**不会**在 load_config() 里被自动调用：自动改网卡会让
+  「仿真 / 双网卡 / 容器」这些场景的行为变得不可预测。只有 scripts/real_run.sh
+  （--iface 未显式给时）和 scripts/env_check.py 用它。
 
 相关文件：
   config/go2_sim.json        真正的配置（io_profiles/policy/health/safety/perception）
@@ -88,13 +114,17 @@
   ros2_controller/run_controller.py  控制器入口（load_config -> apply_io_env -> transport）
   real_env/README.md         真机部署 checklist
   docs/ros2-setup.md         ROS 2 / CycloneDDS 安装与排错
+  scripts/env_check.py       上机前环境体检（读 GO2_IFACE / 用 detect_iface）
+  scripts/real_run.sh        按阶段上机（自动 export GO2_IFACE）
+  docs/real-bringup.md       现场 runbook（阶段 / 期望现象 / 排错）
 """
 
 from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict
+import subprocess
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -153,7 +183,7 @@ DEFAULT_IO_PROFILES: Dict[str, Dict[str, Any]] = {
     "real_ros": {
         "name": "ros2",
         "domain_id": 0,
-        "interface": "eth0",     # 改成你的有线网卡名（ip link 查，例如 enp3s0）
+        "interface": "eth0",     # 有线网卡名；现场用 GO2_IFACE 覆盖，别改这里（§6）
         "crc_check": True,
         "watchdog_ms": 60.0,
         "realtime": True,
@@ -269,19 +299,26 @@ def load_config(path: str | None = None, overrides: Dict[str, Any] | None = None
     # 配置文件里额外的顶层 transport 段作为微调（例如换端口/换话题）
     io = _merge(io, cfg.pop("transport", {}) or {})
     # ---- 2.5) 环境变量微调：容器/真机上“网卡名 / domain 与配置文件不同”时不必改文件
-    #   GO2_INTERFACE=eth1   覆盖 io profile 的 interface（真机有线网卡名；容器里
-    #                        看到的是 WSL/docker 侧的名字，通常和宿主机不同）
+    #   GO2_IFACE=eth1       覆盖 io profile 的 interface（推荐；上机脚本自动 export）
+    #   GO2_INTERFACE=eth1   旧名，保留兼容（docker/setup_unitree_humble.sh 在用）；
+    #                        两个都设时以 GO2_IFACE 为准
     #   GO2_DOMAIN_ID=0      覆盖 domain_id（一般不用改：真机 0 / 仿真 1）
-    _env_iface = os.environ.get("GO2_INTERFACE")
+    # 记录「哪个字段被哪个环境变量覆盖」，io_summary() 打印出来，现场核对用。
+    _env_overrides: Dict[str, str] = {}
+    _env_iface = os.environ.get("GO2_IFACE") or os.environ.get("GO2_INTERFACE")
     if _env_iface:
         io["interface"] = _env_iface
+        _env_overrides["interface"] = ("GO2_IFACE" if os.environ.get("GO2_IFACE")
+                                       else "GO2_INTERFACE")
     _env_domain = os.environ.get("GO2_DOMAIN_ID")
     if _env_domain:
         try:
             io["domain_id"] = int(_env_domain)
+            _env_overrides["domain_id"] = "GO2_DOMAIN_ID"
         except ValueError:
             pass
     cfg["transport"] = io
+    cfg["_env_overrides"] = _env_overrides
     cfg["watchdog_ms"] = float(io.get("watchdog_ms", 60.0))
 
     # ---- 3) CLI 覆盖（transport 字段单独深度 merge）
@@ -327,6 +364,11 @@ def io_summary(cfg: Dict[str, Any]) -> str:
         real_ros -> IOROS(ROS2/cyclonedds) [真机 domain=0 iface=eth0] 看门狗 60 ms
         sim_udp  -> LOCAL(udp)             [仿真 127.0.0.1:50001]        看门狗 60 ms
 
+    被环境变量覆盖过时（GO2_IFACE / GO2_DOMAIN_ID），末尾追加来源标注，例如：
+        real_ros -> IOROS(ROS2/cyclonedds) [真机 domain=0 iface=enp3s0] 看门狗 60 ms
+                    [env 覆盖: interface<-GO2_IFACE]
+    现场第一件事就是核对这一行：iface 不对 = 必然收不到 /lowstate。
+
     注意：这里打印的「看门狗」是仿真侧 SafetyLimiter 的；真机保护见 health_profiles。
     """
     io = cfg["transport"]
@@ -340,7 +382,27 @@ def io_summary(cfg: Dict[str, Any]) -> str:
     env = "真机" if cfg["target"].startswith("real") else "仿真"
     extra = ("domain=%s iface=%s" % (io.get("domain_id"), io.get("interface"))
              if name in ("ros2", "dds") else ("%s:%s" % (io.get("host"), io.get("cmd_port"))))
-    return "%s -> %s  [%s]  看门狗 %.0f ms" % (cfg["target"], kind, env + " " + extra, cfg["watchdog_ms"])
+    line = "%s -> %s  [%s]  看门狗 %.0f ms" % (cfg["target"], kind, env + " " + extra,
+                                              cfg["watchdog_ms"])
+    line += _env_override_note(cfg, io)
+    return line
+
+
+def _env_override_note(cfg: Dict[str, Any], io: Dict[str, Any]) -> str:
+    """io_summary 的尾巴：只标注「当前生效值确实来自环境变量」的字段。
+
+    为什么要比对：load_config() 里 CLI overrides 的优先级高于环境变量。如果 2.5)
+    覆盖后又被 --transport 改掉，还打印 "interface<-GO2_IFACE" 就会误导现场
+    （明明用的是命令行给的值）。所以这里拿当前值与 os.environ 对一遍再标。
+    """
+    over = dict(cfg.get("_env_overrides") or {})
+    for field, var in list(over.items()):
+        want = os.environ.get(var)
+        if want is None or str(io.get(field)) != str(want):
+            over.pop(field)
+    if not over:
+        return ""
+    return "  [env 覆盖: %s]" % ", ".join("%s<-%s" % (k, v) for k, v in sorted(over.items()))
 
 
 def apply_io_env(cfg: Dict[str, Any]) -> Dict[str, str]:
@@ -386,6 +448,110 @@ def apply_io_env(cfg: Dict[str, Any]) -> Dict[str, str]:
             os.environ[k] = v
     return env
 
+
+# ================================================================ 网卡探测（真机上机用）
+# 与机器人直连的网段（Go2 固件固定 192.168.123.161，PC 侧配 192.168.123.x/24）。
+ROBOT_NET_PREFIX = "192.168.123."
+
+
+def parse_ip_addr(text: str) -> List[Dict[str, Any]]:
+    """解析 `ip -br addr` 的文本输出（纯函数，方便单测；不碰网络）。
+
+    输入形如（列之间是任意空白）：
+        lo               UNKNOWN        127.0.0.1/8 ::1/128
+        enp0s31f6        DOWN
+        wlp0s20f3        UP             10.236.67.3/16 fe80::1/64
+        eth0@if12        UP             192.168.123.99/24
+
+    注意两点（真机上常见）：
+      * 只给两列表示该网卡没有任何地址（DOWN 的有线口就是这种）；
+      * 容器/网桥里的网卡名带 "@if12" 后缀，DDS 要的是前面的 "eth0"，所以这里剥掉。
+
+    Args:
+        text: `ip -br addr` 的 stdout（空串也安全）。
+    Returns:
+        [{"name": 网卡名, "state": "UP"/"DOWN"/..., "ipv4": [(addr, 前缀长度)],
+          "ipv6": [(addr, 前缀长度)]}]，顺序与输入一致。
+    """
+    out: List[Dict[str, Any]] = []
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        name = parts[0].split("@", 1)[0]
+        state = parts[1].upper()
+        ipv4: List[Any] = []
+        ipv6: List[Any] = []
+        for tok in parts[2:]:
+            addr, _, plen = tok.partition("/")
+            try:
+                prefix = int(plen)
+            except ValueError:
+                prefix = -1
+            (ipv6 if ":" in addr else ipv4).append((addr, prefix))
+        out.append({"name": name, "state": state, "ipv4": ipv4, "ipv6": ipv6})
+    return out
+
+
+def list_interfaces() -> List[Dict[str, Any]]:
+    """跑一次 `ip -br addr` 并解析；机器上没有 ip 命令 / 执行失败时返回 []。
+
+    只读：不 up/down 网卡、不改路由。env_check 与 real_run.sh 共用这一份实现，
+    避免「两个脚本对网卡名的理解不一致」。
+    """
+    try:
+        p = subprocess.run(["ip", "-br", "addr"], capture_output=True, text=True,
+                           timeout=3)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if p.returncode != 0:
+        return []
+    return parse_ip_addr(p.stdout)
+
+
+def interface_in_subnet(rec: Dict[str, Any], prefix: str = ROBOT_NET_PREFIX) -> bool:
+    """网卡记录里是否有 IPv4 落在 prefix（默认 192.168.123.）里。"""
+    return any(str(addr).startswith(prefix) for addr, _ in rec.get("ipv4") or [])
+
+
+def pick_iface(records: List[Dict[str, Any]],
+               prefer_prefix: str = ROBOT_NET_PREFIX) -> Optional[str]:
+    """从网卡记录里挑「最可能是连机器人的那条链路」的名字（纯函数，方便单测）。
+
+    优先级（见模块 docstring §6）：
+      1) UP 且 IPv4 在 prefer_prefix 网段 —— PC 直连 Go2 的标准形态；
+      2) UP 且非 lo、非无线（名字不以 wl / wlan 开头）—— 用户把 PC 配到了别的网段；
+      3) None —— 不猜。
+
+    Args:
+        records: parse_ip_addr() 的输出。
+        prefer_prefix: 优先匹配的 IPv4 前缀。
+    Returns:
+        网卡名；猜不出来时 None（调用方应保留 config 默认值并提示用户手给 --iface）。
+    """
+    for rec in records:
+        if rec.get("state") == "UP" and interface_in_subnet(rec, prefer_prefix):
+            return rec["name"]
+    for rec in records:
+        name = rec.get("name") or ""
+        if rec.get("state") != "UP" or name == "lo":
+            continue
+        if name.startswith(("wl", "wlan")):   # 无线：DDS 绑上去一定收不到固件广播
+            continue
+        return name
+    return None
+
+
+def detect_iface(prefer_prefix: str = ROBOT_NET_PREFIX) -> Optional[str]:
+    """探测本机该用哪张网卡连机器人：list_interfaces() + pick_iface()。
+
+    只读、不抛异常（失败一律 None）。被 scripts/real_run.sh（--iface 未给时）与
+    scripts/env_check.py 调用；**load_config() 不会自动调用它**（避免行为不可预测）。
+    """
+    return pick_iface(list_interfaces(), prefer_prefix)
 
 # ================================================================ 机型相关路径/对象
 # 机型 -> 机器人本体 MJCF 文件名（注意 go2 是本项目转换出来的力矩版）

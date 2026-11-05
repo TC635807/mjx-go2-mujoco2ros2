@@ -60,6 +60,14 @@
   并且断流时给 health.check 传 None（让 health 用自己记录的"最后收到时间"算 age）。
   同时 duration 按拍数计时，不依赖是否收到状态 —— 没接机器人时也能正常退出。
 
+  但**控制器/安全监督器不能直接用这个 clock**：真机 LowState.tick 是固件开机毫秒，
+  sim_time ≈ 开机秒数（可能几百秒）。prepose_s / ramp_s / start_delay_s 这些
+  "进程启动后多久"的窗口会被瞬间跳过（真机上 1.5 s 预摆位直接失效、stand 的
+  kp 斜坡一步到位）。所以：
+      t_ctrl = clock - 首次拿到状态时的 clock        # 只给 ctrl/supervisor/debug
+      health.check(now=clock)                        # 继续用绝对时钟算 age
+  仿真里 sim_time 从 0 开始，t_ctrl ≈ clock，行为不变。
+
 ===============================================================================
 5. 真机与仿真的差异（只看这几点）
 ===============================================================================
@@ -365,6 +373,11 @@ class ControllerNode:
         self.on_control = on_control
         self.n_state = 0
         self.n_cmd = 0
+        self.n_publish_err = 0    # publish_cmd 抛异常次数（真机上非 0 必须停下来查）
+        self.max_loop_gap = 0.0   # 相邻两拍的最大墙钟间隔（正常 ≈ sim_dt；远大于它是调度停顿）
+        self._last_iter = None
+        self._last_report = 0.0
+        self._rep_n_cmd = 0
         self._state: Optional[LowState] = None
         self._cmd = LowCmd().zero()
         self._k = 0
@@ -425,12 +438,18 @@ class ControllerNode:
         n_steps = None if duration <= 0 else int(round(duration / self.dt))
         pacer = Pacer(self.dt, enabled=realtime)
         t_ctrl0 = time.monotonic()
+        t_ctrl_origin = None   # 本地时基起点：首次拿到状态时的 clock（见模块 docstring §4）
         health_state = None
         k = 0
         clock = 0.0          # 逻辑时钟：新鲜状态用 sim_time/tick，断流后按 dt 推进
         n_no_state = 0
         warned_no_state = False
         while n_steps is None or k < n_steps:
+            # 拍间隔统计：500 Hz 的"停顿"是真机风险（停顿期间没有新指令，固件行为未知）。
+            _t_iter = time.perf_counter()
+            if self._last_iter is not None:
+                self.max_loop_gap = max(self.max_loop_gap, _t_iter - self._last_iter)
+            self._last_iter = _t_iter
             # (1) 取最新状态。recv_state 是非阻塞的：没新消息返回 None（fresh=False）。
             st = self.tr.recv_state()
             fresh = st is not None
@@ -458,6 +477,11 @@ class ControllerNode:
                 k += 1
                 continue
             now = clock
+            # (3.5) 控制器/监督器用本地时基（见模块 docstring §4）：真机 sim_time 是固件
+            # 开机秒数，直接用它会让 prepose/ramp/start_delay 窗口全部失效。
+            if t_ctrl_origin is None:
+                t_ctrl_origin = now
+            t_ctrl = now - t_ctrl_origin
             # (4) 健康分级：断流时传 None（见模块 docstring §4），由 health 自己记 age。
             if self.health is not None:
                 # 断流后传 None：health 用自己记录的"最后一次收到状态"的时间判 age；
@@ -469,27 +493,55 @@ class ControllerNode:
                     self.first_level = health_state.level_name
             # (5) 50 Hz 策略推理（decim=10）。50 Hz 之间沿用上一条 LowCmd（零阶保持）。
             if k % self.decim == 0:
-                self._cmd = self.ctrl.update(self._state, now)
+                self._cmd = self.ctrl.update(self._state, t_ctrl)
                 self._k += 1
                 if self.on_control is not None:
                     try:
                         self.on_control(self._state, self._cmd, self.ctrl,
-                                        health_state, self.supervisor, now)
+                                        health_state, self.supervisor, t_ctrl)
                     except Exception as exc:   # 调试发布不能让控制回路挂掉
                         if self.verbose:
                             print("[ctrl] on_control 异常:", repr(exc)[:160])
             # (6) 安全监督器：按健康等级决定最终下发什么（track/crouch/damping/estop）。
             cmd = self._cmd
             if self.supervisor is not None and health_state is not None:
-                cmd = self.supervisor.process(cmd, health_state, now, self.dt)
+                cmd = self.supervisor.process(cmd, health_state, t_ctrl, self.dt)
                 self.mode_hist[self.supervisor.mode] = self.mode_hist.get(self.supervisor.mode, 0) + 1
             # (7) 500 Hz 下发：真机后端在这里写固定头 + CRC（transport/ros2.py）。
-            self.tr.publish_cmd(cmd)
+            # publish 抛异常不能把整个循环静默带走：真机上那等于"进程还活着、指令已经停了"，
+            # 而且退出路径的阻尼收尾也永远不会执行。这里计数 + 限频打印，由 summary 暴露。
+            try:
+                self.tr.publish_cmd(cmd)
+            except Exception as exc:      # noqa: BLE001 - 中间件异常类型不稳定
+                self.n_publish_err += 1
+                if self.n_publish_err <= 3 or self.n_publish_err % 200 == 0:
+                    print("[ctrl] ⚠ publish_cmd 异常 x%d: %r" % (self.n_publish_err, exc))
             self.n_cmd += 1
             pacer.tick()
+            # (8) 现场可视：每 1 s 打一行进度。真机上一跑 60 s，如果什么都不打印，
+            #     操作员没法判断"指令流活没活、健康等级掉没掉"，而"先把流跑稳、再去切
+            #     sport_mode"这个安全顺序完全依赖这个判断（2026-11-05 上机需求）。
+            if self.verbose:
+                _t_rep = time.monotonic()
+                if _t_rep - self._last_report >= 1.0:
+                    _dt_rep = _t_rep - (self._last_report or t_ctrl0)
+                    self._last_report = _t_rep
+                    _hz = (self.n_cmd - self._rep_n_cmd) / max(_dt_rep, 1e-6)
+                    self._rep_n_cmd = self.n_cmd
+                    _why = ""
+                    if health_state is not None and getattr(health_state, "reasons", None):
+                        _why = "  why=" + ",".join(str(r) for r in health_state.reasons[:3])
+                    print("[ctrl] t=%5.1fs  n_state=%-6d n_cmd=%-6d %4.0f Hz  level=%-9s mode=%s%s"
+                          % (t_ctrl, self.n_state, self.n_cmd, _hz,
+                             health_state.level_name if health_state is not None else "-",
+                             self.supervisor.mode if self.supervisor is not None else "-",
+                             _why),
+                          flush=True)
             k += 1
         # ---- summary：排障时先看 n_state/n_cmd、health.level_hist、transport.bad_crc
         out = {"pacer": pacer.stats(), "n_state": self.n_state, "n_cmd": self.n_cmd,
+               "n_publish_err": self.n_publish_err,
+               "max_loop_gap_ms": round(self.max_loop_gap * 1e3, 3),
                "n_no_state": n_no_state, "ever_state": self._state is not None,
                "control_ticks": self._k, "controller": self.ctrl.stats(),
                "transport": self.tr.stats()}

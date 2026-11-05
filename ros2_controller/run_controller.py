@@ -59,7 +59,24 @@
   3) --controller zero  确认 /lowstate 通、电机能进伺服
   4) --controller stand 看关节平滑走到站姿
   5) 落地后 --controller policy --scan leg_fk（平地安全档）
-  6) 退出/异常时本进程会先发 100 ms 阻尼再断流（--no-damping 可关）
+  6) 退出/异常时本进程会先发 100 ms 阻尼再断流
+     （real_* 上 --no-damping / --no-health / --no-supervisor 会被**拒绝**，
+       必须显式 --force-unsafe；仿真里照常可用）
+  7) 速度**不用重启**就能改（首测标准节奏：--cmd 0 0 0 起立 -> 落地 -> 再给速度）：
+       另开终端 ros2 topic pub -r 10 /go2/cmd_vel geometry_msgs/msg/Twist \
+           "{linear: {x: 0.2}}"
+     vx 夹 [-0.2,0.8]、vy 夹 [-0.3,0.3]、wz 夹 [-0.8,0.8]；--cmd-timeout(默认 3 s)
+     内没有新消息就自动回零（原地踏步）。--no-cmd-topic 可整条关掉。
+  8) 另开一个进程跑 scripts/failsafe_guard.py --target real_ros：控制器被 kill -9 /
+     卡死 / PC 休眠后，只有它还在发 kp=0/kd=8 的阻尼（默认不真发，先 --selftest
+     与 sim_ros 验证，再加 --enable-publish；见 docs/safety-audit.md）
+
+  真机与仿真在安全层上的差别（都能用 config 的 safety 段显式覆盖/关回）：
+    1) real_* 默认开启 q_des 限速 20 rad/s（safety.q_slew_rate）——真机力矩由固件
+       按 kp*(q_des-q) 算，我们夹的 cmd.tau 在真机路径上恒 0，等于没夹；
+    2) real_* 默认 L3 发"纯阻尼"而不是"卸力"（safety.estop_policy=damp）——L3 最
+       常见的触发源是 LowState 断流，那时发 mode=1/kp=0/kd=8 比 mode=0 的瘫软安全。
+  详见 ros2_controller/safety.py 顶部与 docs/safety-audit.md §3.2/§3.5。
 
 例:
     scripts/run_with_ros2.sh ros2_controller/run_controller.py \
@@ -86,11 +103,100 @@ sys.path.insert(0, ROOT)
 
 from signal_io.config import (PROJECT_ROOT, apply_io_env, io_summary, load_config,  # noqa: E402
                                model_xml, robot_body_xml, robot_spec_of)
-from ros2_controller.controller import (PolicyController, StandController,  # noqa: E402
-                                    WbcLqrStub, ZeroController)
+from ros2_controller.controller import (DampController, PolicyController,  # noqa: E402
+                                    StandController, WbcLqrStub, ZeroController)
 from signal_io.node import ControllerNode  # noqa: E402
 from sim_env.robot import MOTOR_JOINTS, Go2Sim  # noqa: E402
 from signal_io.transport import make_transport  # noqa: E402
+
+
+# real_* 目标上会被拒绝的危险开关：(argparse 属性名, 命令行写法, 关掉它意味着什么)
+UNSAFE_FLAGS = (
+    ("no_health", "--no-health", "关掉健康分级：LowState 断流/IMU NaN/姿态超限/电机过温都不再判级"),
+    ("no_supervisor", "--no-supervisor", "关掉安全监督器：不再有 crouch/damping/estop，等于纯直通"),
+    ("no_damping", "--no-damping", "关掉退出阻尼：进程退出/异常后不发 kp=0/kd=8，机器人保持最后一条指令"),
+)
+
+
+# 运行期 cmd_vel 的安全限幅 (vx, vy, wz)：真机首测不接受 2 m/s 这种输入。
+# 上界给的是"平地首测够快但撞了也还能救"的量级；要更快请改这里，别在终端硬发。
+CMD_VEL_LIMITS = ((-0.2, 0.8), (-0.3, 0.3), (-0.8, 0.8))
+
+
+def clip_cmd_vel(vx: float, vy: float, wz: float) -> tuple:
+    """把 cmd_vel 三轴夹到首测安全范围，返回 (vx, vy, wz)。
+
+    为什么在**回调里**就夹、而不是等策略：/go2/cmd_vel 是给人手敲的（ros2 topic pub），
+    一个多余的 0 就能让机器人跑出去；夹在这里，越界的输入永远进不了观测。
+    """
+    (x0, x1), (y0, y1), (z0, z1) = CMD_VEL_LIMITS
+    return (float(np.clip(vx, x0, x1)), float(np.clip(vy, y0, y1)),
+            float(np.clip(wz, z0, z1)))
+
+
+def resolve_q_slew_rate(safety_cfg, target: str):
+    """决定 SafetySupervisor 的 q_des 限速 (rad/s)：返回 (值|None, 来源说明)。
+
+    真机必须开：真机的力矩是固件按 kp*(q_des-q) 算的，我们夹的 cmd.tau 在真机路径
+    上恒 0，等于没夹（见 ros2_controller/safety.py 顶部）。仿真默认关闭，保持训练/
+    部署一致性（仿真的力矩本来就由 SimNode 按 PD 算并夹住）。
+
+    优先级：config 的 safety.q_slew_rate（显式 0/null = 关闭）> real_* 默认 20 > 仿真关闭。
+    20 rad/s 在 2 ms 拍上 = 0.04 rad/拍；kp=20 时首拍力矩最多 0.8 N*m。
+    """
+    s = dict(safety_cfg or {})
+    if "q_slew_rate" in s:
+        q = s.get("q_slew_rate")
+        if q is None or float(q) <= 0.0:
+            return None, "cfg.safety.q_slew_rate（显式关闭）"
+        return float(q), "cfg.safety.q_slew_rate"
+    if str(target).startswith("real_"):
+        return 20.0, "real_* 默认（真机必须限制 q_des 跳变）"
+    return None, "仿真默认关闭（保持训练/部署一致性）"
+
+
+def resolve_estop_policy(safety_cfg, target: str):
+    """决定 L3 急停下发 "zero" 还是 "damp"：返回 (值, 来源说明)。
+
+    为什么真机默认 "damp"：L3 最常见的触发源是 /lowstate 断流（real_* 档 250 ms）。
+    那一刻我们拿不到 q、也来不及算别的东西，但如果发 mode=0 的全零（卸力），一台
+    30 kg 的机器狗会直接瘫倒；发 mode=1/kp=0/kd=8 的**纯关节阻尼**，则是"阻尼着
+    倒下"，与官方退出流程 create_damping_cmd 同义，对机器人和地板都更友好。
+    仿真默认 "zero"：保持与旧行为逐位一致（训练/部署一致性 + sha256 回归）。
+
+    优先级：config 的 safety.estop_policy（显式给就听它的）> real_* 默认 damp > 仿真 zero。
+    """
+    from ros2_controller.safety import ESTOP_POLICIES
+
+    s = dict(safety_cfg or {})
+    raw = s.get("estop_policy")
+    if raw is not None:
+        p = str(raw).strip().lower()
+        if p not in ESTOP_POLICIES:
+            raise SystemExit("safety.estop_policy 只能是 %s，得到 %r"
+                             % ("/".join(ESTOP_POLICIES), raw))
+        return p, "cfg.safety.estop_policy"
+    if str(target).startswith("real_"):
+        return "damp", "real_* 默认（LowState 断流时发阻尼而不是瘫软）"
+    return "zero", "仿真默认（与旧行为逐位一致）"
+
+
+def unsafe_flag_refusals(args, target: str) -> list:
+    """real_* 目标上被拒绝的危险开关；返回空列表表示允许继续。
+
+    为什么只在 real_* 上拒绝：仿真里这些开关是排障刚需（定位是控制器还是安全层的
+    问题），而真机上它们等于把唯一的安全网拆掉：
+      * 真机没有"指令掉线自动卸力"的软件看门狗（watchdog_ms 只对仿真 SimNode 生效）；
+      * 关掉 health/supervisor 后，LowState 断流时进程会继续按 500 Hz 发最后一条指令；
+      * 关掉退出阻尼后，进程一死机器人就停在最后一条指令上，固件行为未知。
+    确认要承担风险时才加 --force-unsafe（会打印它到底承担了什么）。
+    """
+    if not str(target).startswith("real_"):
+        return []
+    if bool(getattr(args, "force_unsafe", False)):
+        return []
+    return [(attr, flag, why) for attr, flag, why in UNSAFE_FLAGS
+            if bool(getattr(args, attr, False))]
 
 
 def joint_ranges(xml_path: str):
@@ -334,7 +440,7 @@ def build_policy_controller(cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None,
 
 
 def build_controller(name: str, cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=None,
-                     scan_holder=None):
+                     scan_holder=None, damp_kd: float = 8.0):
     """按 --controller 选择控制器实现（真机首次上机建议 zero/stand）。
 
     zero      : 零力矩，确认状态链路 + 电机能进伺服
@@ -348,6 +454,8 @@ def build_controller(name: str, cfg: dict, sim: Go2Sim, cli_cmd=None, linvel=Non
                                        scan_holder=scan_holder)
     if name == "zero":
         return ZeroController()
+    if name == "damp":
+        return DampController(kd=damp_kd)
     if name == "lqr_stub":
         return WbcLqrStub(sim.stand_pose)
     return StandController(sim.stand_pose, kp=c.get("kp", 60.0), kd=c.get("kd", 5.0),
@@ -361,8 +469,11 @@ def main() -> int:
         description="Go2 控制侧（50 Hz 策略 + 500 Hz 指令；仿真/真机同一份代码）")
     ap.add_argument("--config", default=os.path.join(ROOT, "config", "go2_sim.json"),
                     help="配置文件（io_profiles / policy_profiles / health / safety）")
-    ap.add_argument("--controller", default="stand", choices=["zero", "stand", "lqr_stub", "policy"],
-                    help="zero=零力矩 / stand=站姿 PD / policy=策略 / lqr_stub=占位")
+    ap.add_argument("--controller", default="stand",
+                    choices=["zero", "stand", "damp", "lqr_stub", "policy"],
+                    help="zero=零力矩 / stand=站姿 PD / damp=纯阻尼（只改 kd，用来确认控制权）/ policy=策略 / lqr_stub=占位")
+    ap.add_argument("--damp-kd", type=float, default=8.0,
+                    help="--controller damp 的阻尼系数。真机待机时固件自己发 kd=3；发 kd=8 手感明显变黏 = 我们的指令已能盖过固件兜底")
     ap.add_argument("--robot", default=None, choices=["go2"],
                     help="当前被控机型（真机是 go2）")
     ap.add_argument("--cmd", type=float, nargs=3, default=None,
@@ -390,6 +501,33 @@ def main() -> int:
     ap.add_argument("--json", default=None, help="把 summary 落盘到该路径（排查真机问题用）")
     ap.add_argument("--no-damping", action="store_true",
                     help="真机退出时不发阻尼收尾（默认会发 100 ms kp=0/kd=8）")
+    ap.add_argument("--force-unsafe", action="store_true",
+                    help="允许在 real_* 目标上使用 --no-health/--no-supervisor/--no-damping "
+                         "（默认拒绝；只有你明确知道自己在拆哪张安全网时才加）")
+    ap.add_argument("--cmd-topic", default="/go2/cmd_vel",
+                    help="运行期速度指令话题（geometry_msgs/Twist；vx=linear.x, "
+                         "vy=linear.y, wz=angular.z）。首测用它免重启改速度")
+    ap.add_argument("--no-cmd-topic", action="store_true",
+                    help="关掉运行期速度指令订阅（只用启动时的 --cmd）")
+    ap.add_argument("--remote", action="store_true",
+                    help="用实物遥控器 /wirelesscontroller 摇杆驱动速度指令（和 --cmd-topic 同一路，限幅/失联回零复用）；按住 L1 = 速度归零急停")
+    ap.add_argument("--remote-topic", default="/wirelesscontroller")
+    ap.add_argument("--remote-map", default="ly,lx,rx",
+                    help="摇杆轴映射：vx,vy,wz 各取哪个轴（ly/lx/rx/ry）")
+    ap.add_argument("--remote-gain", type=float, nargs=3, default=[0.8, -0.3, -0.8],
+                    metavar=("VX", "VY", "WZ"),
+                    help="满杆 vx/vy/wz；vy/wz 取负：体坐标 +y=左、+wz=左转，摇杆右为正")
+    ap.add_argument("--remote-estop-keys", default="L2+B",
+                    help="按住此组合键 = 纯阻尼急停（默认 L2+B，与 mcf 软急停一致）；空=关闭")
+    ap.add_argument("--remote-estop-kd", type=float, default=8.0,
+                    help="按键急停时的 kd（纯阻尼）")
+    ap.add_argument("--remote-deadzone", type=float, default=0.08,
+                    help="摇杆死区（|axis| 小于它视为 0）")
+    ap.add_argument("--remote-timeout", type=float, default=0.6,
+                    help="遥控器静默多久后速度回零（秒）")
+    ap.add_argument("--cmd-timeout", type=float, default=3.0,
+                    help="cmd_vel 静默多少秒后速度指令自动回零（默认 3 s；0 = 不回零，"
+                         "真机上不建议）")
     ap.add_argument("--publish-debug", action="store_true",
                     help="发布 /go2/controller/{obs,action,info}（观察器需要；仅 ROS 2）")
     ap.add_argument("--policy-profile", default=None,
@@ -413,6 +551,22 @@ def main() -> int:
             cfg.setdefault("policy", {})["height_scan_source"] = "leg_fk"
     if args.clearance_hz is not None:
         cfg.setdefault("policy", {})["clearance_hz"] = args.clearance_hz
+
+    # ------------------------------------------------------ 2.5) 真机危险开关闸门
+    # 放在装配模型/传输之前：这样"误用危险开关"会在 100 ms 内报错退出，
+    # 而不是先连上 DDS、把机器人接管了才发现自己关掉了安全层。
+    _refused = unsafe_flag_refusals(args, cfg["target"])
+    if _refused:
+        print("[ctrl] ✗ 拒绝在真机 target=%s 上使用 %s"
+              % (cfg["target"], " ".join(_flag for _attr, _flag, _why in _refused)),
+              file=sys.stderr)
+        for _attr, _flag, _why in _refused:
+            print("[ctrl]   %-16s %s" % (_flag, _why), file=sys.stderr)
+        print("[ctrl]   真机上这些开关会把唯一的安全网拆掉（真机没有指令掉线自动卸力）。",
+              file=sys.stderr)
+        print("[ctrl]   仿真里它们照常可用；确实要在真机上这么跑，请显式加 --force-unsafe。",
+              file=sys.stderr)
+        return 2
 
     # ------------------------------------------------------------ 3) 模型元数据
     # 只借模型拿标称站姿/关节范围，不参与仿真。
@@ -449,7 +603,104 @@ def main() -> int:
 
     # ------------------------------------------------------------ 6) 策略/控制器
     ctrl = build_controller(args.controller, cfg, sim, cli_cmd=args.cmd,
-                            linvel=args.linvel, scan_holder=scan_holder)
+                            linvel=args.linvel, scan_holder=scan_holder,
+                            damp_kd=args.damp_kd)
+
+    # ------------------------------------------------------ 6.5) 运行期速度指令（首测关键）
+    # 为什么需要：--cmd 是**启动参数**，改速度只能重启进程；真机上重启 =
+    # "先卸力落地 -> 再重新起立"，首测极不友好。首测最稳的节奏是
+    #   --cmd 0 0 0 起立站住 -> 吊装/落地确认 -> 再给 0.2 m/s。
+    # 所以订阅 /go2/cmd_vel（geometry_msgs/Twist）在运行中改 obs 9:12 那段指令；
+    # 失联回零：话题静默超过 --cmd-timeout 秒自动归零（原地踏步），避免
+    # "操作员终端挂了，狗还按最后一条速度一直往前走"。
+    if cfg["transport"]["name"] == "ros2" and not args.no_cmd_topic:
+        if callable(getattr(ctrl, "set_command", None)):
+            from geometry_msgs.msg import Twist
+
+            from ros2_controller.controller import LiveCommandController
+
+            # --remote 用更短的失联窗口：遥控器实测只有 9~10 Hz，0.6 s 静默就归零
+            _live_timeout = args.remote_timeout if args.remote else args.cmd_timeout
+            # 按键阻尼闸：mcf 被 --release-mode 释放后，遥控器 L2+B（软急停）会失效，
+            # 因为那是 mcf 的功能。这里用同一个组合键在我们自己的环里实现「按住=纯阻尼」，
+            # 这样无论 mcf 在不在，急停效果一致。
+            _gate = None
+            _mask = 0
+            if args.remote and str(args.remote_estop_keys).strip():
+                from ros2_controller.controller import BUTTON_BITS, KeyGateController
+
+                for _nm in str(args.remote_estop_keys).replace("+", " ").split():
+                    _bit = BUTTON_BITS.get(_nm.strip().upper())
+                    if _bit is None:
+                        raise SystemExit("--remote-estop-keys 里有未知键名 %r" % _nm)
+                    _mask |= (1 << _bit)
+                _gate = KeyGateController(ctrl, kd=float(args.remote_estop_kd))
+                ctrl = _gate
+                print("[ctrl] 按键急停   = %s 按住 -> kp=0/kd=%.1f 纯阻尼（不依赖 mcf）"
+                      % (args.remote_estop_keys, float(args.remote_estop_kd)))
+            live = LiveCommandController(ctrl, timeout_s=_live_timeout)
+            ctrl = live            # 必须在 ControllerNode 之前换掉
+
+            def _on_twist(m, _lc=live):     # noqa: ANN001 - ROS 回调
+                # 三轴限幅是安全护栏（见 clip_cmd_vel）：越界输入永远进不了观测。
+                _lc.set_command(clip_cmd_vel(m.linear.x, m.linear.y, m.angular.z))
+
+            tr.create_subscription(Twist, args.cmd_topic, _on_twist)
+
+            # ---- 实物遥控器 -> 同一个 LiveCommandController ------------------
+            # 为什么接这条路：/wirelesscontroller 已经带 lx/ly/rx/ry + keys（实测 9~10 Hz），
+            # 直接映射成 cmd_vel 复用现成的限幅/失联回零，比另起一套安全逻辑可靠。
+            # 按住 L1 时立刻把速度归零（走路中松手/急停不用等 0.6 s 超时）。
+            if args.remote:
+                from rclpy.qos import qos_profile_sensor_data
+
+                from unitree_go.msg import WirelessController
+
+                _axes = [s.strip() for s in str(args.remote_map).split(",")]
+                if len(_axes) != 3:
+                    raise SystemExit("--remote-map 需要 3 段，例如 ly,lx,rx")
+                _gain = [float(x) for x in args.remote_gain]
+
+                def _on_remote(m, _lc=live, _axes=_axes, _gain=_gain,
+                               _gate=_gate, _mask=_mask):
+                    keys = int(m.keys) & 0xFFFF
+                    # 组合键（默认 L2+B）按住 = 纯阻尼急停；松手先归零再恢复
+                    if _gate is not None and _mask:
+                        _held = (keys & _mask) == _mask
+                        if _held != _gate.active:
+                            _gate.set_estop(_held)
+                            if not _held:
+                                _lc.set_command((0.0, 0.0, 0.0))
+                        if _held:
+                            return
+                    # L1 = bit1：按住即速度归零（不是 L3，不会卸力）
+                    if keys & 0x02:
+                        _lc.set_command((0.0, 0.0, 0.0))
+                        return
+                    vals = {"lx": float(m.lx), "ly": float(m.ly),
+                            "rx": float(m.rx), "ry": float(m.ry)}
+                    out = []
+                    for i, name in enumerate(_axes):
+                        v = vals.get(name, 0.0)
+                        if abs(v) < args.remote_deadzone:
+                            v = 0.0
+                        out.append(v * _gain[i])
+                    _lc.set_command(clip_cmd_vel(out[0], out[1], out[2]))
+
+                tr.create_subscription(WirelessController, args.remote_topic,
+                                       _on_remote, qos_profile_sensor_data)
+                print("[ctrl] 遥控器     = %s（映射 %s，满杆 %s，死区 %.2f，静默 %.1f s 回零，L1=归零）"
+                      % (args.remote_topic, args.remote_map, _gain,
+                         args.remote_deadzone, args.remote_timeout))
+            print("[ctrl] 运行期速度 = %s（vx[-0.2,0.8] vy[-0.3,0.3] wz[-0.8,0.8]；"
+                  "失联 %.1f s 回零；启动初值仍取 --cmd/配置）"
+                  % (args.cmd_topic, args.cmd_timeout))
+            if str(cfg["target"]).startswith("real_") and args.cmd_timeout <= 0.0:
+                print("[ctrl] ⚠ 真机上关掉了 cmd_vel 失联回零（--cmd-timeout<=0）："
+                      "话题静默后机器人会继续按最后一条速度走。首测不要这么跑。")
+        else:
+            print("[ctrl] 运行期速度 = 关闭（--controller %s 没有 set_command，"
+                  "只有 policy 支持运行期改速度）" % args.controller)
 
     # ------------------------------------------------------------ 7) 健康层 + 安全层
     # 健康层：LowState 断流/NaN/姿态/电机 lost+温度+bit_flag -> L0..L3。
@@ -462,12 +713,31 @@ def main() -> int:
     if not args.no_supervisor:
         from ros2_controller.safety import SafetySupervisor
         s = cfg.get("safety", {})
+        # q_des 限速（rad/s）——真机上真正能压住"首拍力矩"的那一条：
+        #   真机的力矩是固件按 kp*(q_des-q)+kd*(0-dq) 算的，SafetyLimiter 夹的 tau 恒 0，
+        #   所以力矩硬限幅/斜率限幅在真机路径上不生效（见 ros2_controller/safety.py 顶部）。
+        q_slew_rate, q_slew_src = resolve_q_slew_rate(s, cfg["target"])
+        estop_policy, estop_src = resolve_estop_policy(s, cfg["target"])
         supervisor = SafetySupervisor(
             sim.stand_pose, limits=sim.torque_limits, ramp_rate=cfg.get("ramp_rate", 200.0),
             mode_kp=float(s.get("mode_kp", 20.0)), mode_kd=float(s.get("mode_kd", 1.0)),
-            crouch_depth=float(s.get("crouch_depth", 0.35)), crouch_s=float(s.get("crouch_s", 2.0)))
+            crouch_depth=float(s.get("crouch_depth", 0.35)), crouch_s=float(s.get("crouch_s", 2.0)),
+            q_slew_rate=q_slew_rate,
+            # L2 damping 的 kd：config 没给就沿用 mode_kd（旧行为）；真机建议 damp_kd=8。
+            damp_kd=(float(s["damp_kd"]) if s.get("damp_kd") is not None else None),
+            estop_policy=estop_policy)
         if s.get("l2_policy"):
             supervisor.l2_policy = str(s["l2_policy"])
+        if q_slew_rate:
+            print("[ctrl] q_des 限速 = %.1f rad/s（单拍 <= %.3f rad；来源 %s）"
+                  % (q_slew_rate, q_slew_rate * cfg["sim_dt"], q_slew_src))
+        else:
+            print("[ctrl] q_des 限速 = 关闭（%s）" % q_slew_src)
+        if estop_policy == "damp":
+            print("[ctrl] L3 急停    = damp（mode=1/kp=0/kd=%.1f 纯阻尼；来源 %s）"
+                  % (supervisor.estop_kd, estop_src))
+        else:
+            print("[ctrl] L3 急停    = zero（20 槽全 0 = 卸力；来源 %s）" % estop_src)
 
     # ------------------------------------------------------------ 8) 调试发布（可选）
     debug = None

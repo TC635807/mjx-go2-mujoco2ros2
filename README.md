@@ -9,7 +9,7 @@
 [![ROS 2](https://img.shields.io/badge/ROS%202-Lyrical-22314E?logo=ros&logoColor=white)](https://docs.ros.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Policies](https://img.shields.io/badge/policies-26%20profiles-2da44e)](config/go2_sim.json)
-[![Tests](https://img.shields.io/badge/tests-14%2F14%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-17%20files%20(local%2014%2F17)-yellowgreen)](tests/)
 
 **纯 numpy 策略推理（不需要 JAX）· 50 Hz 控制 / 500 Hz 物理 · 31 个评测地形 · 训练-部署逐段对账**
 
@@ -135,7 +135,8 @@ cd mjx-go2-mujoco2ros2
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# 14 个纯 python 测试（消息/CRC/循环/观测/感知/估计/健康/安全/策略/可视化/地形契约）
+# 17 个纯 python 测试文件（消息/CRC/循环/观测/感知/估计/健康/安全/策略/可视化/地形契约/真机自检/环境检查）
+# 本机 14/17：3 个 viz 用例需要 matplotlib 与离屏 GL（环境依赖，非逻辑失败）
 python tests/run_tests.py
 
 # 16 项验收（消息层 / IMU / PD / 双进程实时性；不需要真机）
@@ -303,7 +304,7 @@ PROFILE=go2_v25b bash scripts/view_go2_policy.sh            # 回退
 
 | 项目 | 命令 | 结果 |
 |---|---|---|
-| 单元测试（纯 python，无 pytest） | `python tests/run_tests.py` | **14/14 通过** |
+| 单元测试（纯 python，无 pytest） | `python tests/run_tests.py` | **17 个文件，本机 14/17**（3 个 viz 用例需要 matplotlib/离屏 GL；原始 HEAD 上同样失败） |
 | 消息/IMU/PD/双进程实时性验收 | `python scripts/verify.py --target sim_udp` | **16/16 通过** |
 | 观测/动作对账 | `python scripts/verify_train_deploy_obs.py` | obs 逐段 0、动作 ≤1.15e-6 |
 | 物理等价性 | `python scripts/verify_train_deploy_parity.py --mode all` | 执行器严格等价 |
@@ -339,20 +340,27 @@ ros2 launch ros2_ws/launch/sim.launch.py duration:=20 viewer:=true   # 带观察
 # 或旧的两进程 demo（无独立感知节点，控制器回退 leg_fk）
 ./scripts/demo_ros2_policy.sh 12 go2 sim_clean
 
-# 真机：先只读自检（不发送任何指令），再吊起来 zero -> stand -> policy
-scripts/run_with_ros2.sh scripts/go2_real_check.py --target real_ros --duration 5
-ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=zero duration:=10
-ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=stand duration:=15
-ROS_DOMAIN_ID=0 ros2 launch ros2_ws/launch/real.launch.py controller:=policy duration:=30
-# 手动起控制器（没有可靠 odom 时自动回退 leg_fk）
-scripts/run_with_ros2.sh ros2_controller/run_controller.py --target real_ros \
-    --controller policy --policy-profile go2_v33d --scan leg_fk --linvel estimator --duration 20
+# 真机（按顺序，任何一步不对就停）：上机当天照 docs/sim2real-day0.md 走
+python3 scripts/env_check.py --target real_ros --iface <有线网卡>        # 环境体检（有 FAIL 就别动电机）
+bash scripts/run_with_ros2.sh scripts/real_sensor_check.py \
+    --target real_ros --duration 5 --iface <有线网卡>                    # 25 项传感器只读自检（不发任何指令）
+bash scripts/real_run.sh --dry-run                                       # 看看它要跑什么
+bash scripts/real_run.sh --stage preflight                               # 体检 + 自检（只读）
+bash scripts/real_run.sh --stage zero                                    # 吊起：零力矩 10 s
+bash scripts/real_run.sh --stage stand                                   # 吊起：站姿 PD 15 s
+bash scripts/real_run.sh --stage policy --duration 30 --cmd "0 0 0"      # 落地：先站住
+# 站住之后另开一个终端给速度（不用重启控制器，3 s 不发消息自动回零）
+bash scripts/run_with_ros2.sh scripts/cmd_vel.py 0.2 0 0 --duration 15
 ```
 
-> 真机前必读：[`real_env/README.md`](real_env/README.md)（网络 / domain / 释放 sport mode /
-> CRC / 上电顺序 / 高度扫描风险 / 已知边界 checklist）。
-> `go2_real_check.py` 只订阅不发布：确认 `/lowstate` 频率、电机 mode、`/lowcmd` 是否有
-> 别的进程占用且 CRC 合法、L1 点云 frame/频率、odom 是否有数据。
+> 真机前必读：**[`docs/sim2real-day0.md`](docs/sim2real-day0.md)**（上机当天作战手册）、
+> [`docs/safety-audit.md`](docs/safety-audit.md)（疯车/力矩/断链的缺口与兜底）、
+> [`real_env/README.md`](real_env/README.md)（网络 / domain / 释放 sport mode / CRC / 上电顺序 /
+> 高度扫描风险 / 已知边界 checklist）、[`docs/portability.md`](docs/portability.md)（换机器/上机载电脑）。
+> `real_sensor_check.py` 与 `go2_real_check.py` **只订阅不发布**：确认 `/lowstate` 频率、电机 mode、
+> `/lowcmd` 是否有别的进程占用且 CRC 合法、IMU/足端力/温度、L1 点云 frame/频率、odom 是否有数据。
+> 本机目前**没有装 ROS 2**（`/opt/ros` 不存在）；真机/容器路径统一用 `docker/` 的官方栈
+> （`UNITREE_NIC=<网卡> ROS_DOMAIN_ID=0 docker compose run --rm ros2 bash`，见 docs/sim2real-day0.md §2.2）。
 > 本仓不 vendor 第三方 SDK（`third_party/` 与 `ros2_ws/build|install|log` 未入库），
 > 获取方式见 `docs/ros2-setup.md`。
 
@@ -410,6 +418,11 @@ python sim/export_deploy_terrains.py
 | 文档 | 内容 |
 |---|---|
 | [`docs/reading-map.md`](docs/reading-map.md) | **阅读地图**：三条阅读路线、代码级调用链、模块依赖、目录/配置/测试速查、自检 20 问 |
+| [`docs/sim2real-day0.md`](docs/sim2real-day0.md) | **上机当天作战手册**：时间线、主控机选择（docker 官方栈）、每步命令/期望值/失败判据、6 个必看指标、安全红线、已知缺口 |
+| [`docs/safety-audit.md`](docs/safety-audit.md) | **安全审计**：疯车/力矩/断链/失控的失效→保护→缺口→残留风险；今天落地的 q_des 限速、危险开关闸门、failsafe guard |
+| [`docs/real-bringup.md`](docs/real-bringup.md) | 真机现场 runbook：出发前清单、四阶段时序、summary 字段解读、常见报错→排查、容器一节 |
+| [`docs/portability.md`](docs/portability.md) | **可迁移性**：搬到机载电脑/实验室机器要重建什么、能带走什么、real_run.sh 的可用条件 |
+| [`docker/DEPLOY.md`](docker/DEPLOY.md) | **单文件交付**：把工具链+代码烤进一个镜像（`docker save`/`load`），以及"运行时到底需不需要 docker"的决策表 |
 | [`docs/architecture.md`](docs/architecture.md) | **架构总览**：分层、数据流、模块职责、目录结构、IO matrix、扩展点 |
 | [`docs/ros2-setup.md`](docs/ros2-setup.md) | ROS 2 / CycloneDDS 安装、`unitree_go` 构建、双进程运行、真机切换 |
 | [`docs/unitree-official-sdk-conformance.md`](docs/unitree-official-sdk-conformance.md) | **宇树官方 SDK 要求符合性审计**：消息/CRC/话题/时序逐项对照，宿主机（26.04 + Lyrical + CycloneDDS 11 + py3.14）偏差与修复 |

@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
     --robot-style) VIEW_ARGS+=(--robot-style "$2"); shift 2 ;;
     --lite) VIEW_ARGS+=(--lite "$2"); shift 2 ;;
     --list-terrains)
-      "$ROOT/.venv/bin/python" - <<'PY'
+      "$PY" - <<'PY'
 import json
 p = "sim_env/models/go2/terrains.json"
 d = json.load(open(p, encoding="utf-8"))
@@ -72,7 +72,22 @@ PY
   esac
 done
 
-source /opt/ros/lyrical/setup.bash
+# ---- ROS 2 环境：优先 ROS_SETUP / ROS_DISTRO，其次按发行版回退（与 scripts/run_with_ros2.sh 同口径）----
+# 不能写死 /opt/ros/lyrical：机载电脑 / 实验室机器是 22.04 + Humble，docker 容器里也是 Humble。
+_ros_setup="${ROS_SETUP:-}"
+if [ -n "$_ros_setup" ] && [ -f "$_ros_setup" ]; then
+  source "$_ros_setup"
+elif [ -n "${ROS_DISTRO:-}" ] && [ -f "/opt/ros/${ROS_DISTRO}/setup.bash" ]; then
+  source "/opt/ros/${ROS_DISTRO}/setup.bash"
+elif [ -f /opt/ros/lyrical/setup.bash ]; then
+  source /opt/ros/lyrical/setup.bash
+elif [ -f /opt/ros/humble/setup.bash ]; then
+  source /opt/ros/humble/setup.bash
+else
+  echo "[warn] 没找到 ROS 2 的 setup.bash（用 ROS_SETUP=/opt/ros/<distro>/setup.bash 指定）" >&2
+fi
+PY="${GO2_PYTHON:-$ROOT/.venv/bin/python}"
+if [ ! -x "$PY" ]; then PY="$(command -v python3 || true)"; fi
 if [[ -f "$ROOT/ros2_ws/install/setup.bash" ]]; then
   source "$ROOT/ros2_ws/install/setup.bash"
 fi
@@ -120,7 +135,7 @@ fi
 
 # 地形模式：观察器要加载同一份地形 scene，否则 3D 里的地面/障碍物对不上
 if [[ "$TERRAIN" != "flat" && "$HAS_MODEL" == "0" ]]; then
-  TERRAIN_SCENE=$("$ROOT/.venv/bin/python" - "$TERRAIN" <<'PY'
+  TERRAIN_SCENE=$("$PY" - "$TERRAIN" <<'PY'
 import json, os, sys
 root = os.getcwd()
 name = sys.argv[1]
@@ -137,7 +152,7 @@ PY
   VIEW_ARGS+=(--model "$TERRAIN_SCENE")
 fi
 
-VIEW_CMD=("$ROOT/.venv/bin/python" "$ROOT/scripts/view_ros2.py"
+VIEW_CMD=("$PY" "$ROOT/scripts/view_ros2.py"
           --target sim_ros --truth --duration "$DUR" "${VIEW_ARGS[@]}")
 if [[ "$HEADLESS" == "1" ]]; then
   VIEW_CMD+=(--headless)

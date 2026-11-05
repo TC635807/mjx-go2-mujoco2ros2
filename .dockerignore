@@ -1,0 +1,23 @@
+# 构建上下文 = 仓库根（docker/Dockerfile.deploy 用 COPY . /workspace）。
+# 只排除「机器/版本相关、必须重建」的东西 —— 镜像里已经有一套 py3.10 的
+# /opt/venv（numpy+mujoco+matplotlib）和已编译好的 unitree_go，所以这两类
+# 绝不能从宿主带进去，否则就是 portability.md 里那三种 import 失败。
+.venv/
+build/
+.vscode/
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+logs/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.equiv.npz
+!ros2_controller/policies/go2_walk_v25b.equiv.npz
+!ros2_controller/policies/go2_walk_v33d.equiv.npz
+third_party/
+.git/
+*.tar
+*.tar.zst
+*.tar.gz
+docker/*.tar

@@ -4,6 +4,10 @@
 > mjx-go2-mujoco2ros2 的 ROS 2 路径、官方 unitree_sdk2_python 路径，以及真机前的一切离线验证。
 >
 > 配套审计：[../docs/unitree-official-sdk-conformance.md](../docs/unitree-official-sdk-conformance.md)
+>
+> 📦 **单文件交付（把代码也打包进镜像，离线搬运）**：见 [`DEPLOY.md`](DEPLOY.md)。
+> 一句话：`docker/Dockerfile.deploy` 把仓库 `COPY` 进镜像 → `docker save` 成一个 tar →
+> 目标机 `docker load` 就能跑（不需要网络 / pip / colcon / 重建 venv）。
 
 ---
 

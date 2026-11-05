@@ -1,3 +1,7 @@
+# 编辑器 / 本机构建产物（VSCode CMake 会在仓库根建 build/）
+.vscode/
+build/
+
 # Python
 .venv/
 __pycache__/

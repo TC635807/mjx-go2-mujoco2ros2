@@ -1,4 +1,6 @@
-# 仿真 / 观察器 / 测试的最小依赖（Python >= 3.10；仓库在 3.14 上验证）
+# 仿真 / 观察器 / 测试的最小依赖（Python >= 3.10）
+#   已验证：宿主机 3.13.7（.venv）与官方栈容器 3.10.12（/opt/venv）都能跑；
+#   3.14 上 unitree_sdk2py 的 cyclonedds 绑定不可用（只影响 real_sdk 路径，见 docs/ros2-setup.md §8）。
 mujoco>=3.2,<4
 numpy>=1.26
 

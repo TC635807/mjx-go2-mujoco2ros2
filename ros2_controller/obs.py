@@ -224,6 +224,36 @@ class WalkObsBuilder:
 
         self.reset()
 
+    # -------------------------------------------------------- 运行期指令
+
+    def set_command(self, cmd) -> np.ndarray:
+        """运行期改速度指令（真机"先站住、落地后再给速度"用）。
+
+        为什么要有它：真机上重启控制器 = 机器人先卸力落地再重新起立，代价很大；
+        而首次 sim2real 最稳的流程是「--cmd 0 0 0 站住 → 落地 → 再给前进速度」。
+        改的只是 obs 9:12 那一段（以及 gait_freq_scaled_by_cmd 时的步频），
+        观测布局/维度不变，所以不需要重新加载策略。
+
+        Args:
+            cmd: 3 维 (vx, vy, wz)，必须是有限值。
+        Returns:
+            生效后的 (3,) 数组。
+        Raises:
+            ValueError: 维度不是 3 或含 NaN/Inf。
+        """
+        v = np.asarray(cmd, dtype=np.float64).reshape(-1)
+        if v.size != 3:
+            raise ValueError("command 必须是 3 维 (vx,vy,wz)，得到 %d" % v.size)
+        if not bool(np.all(np.isfinite(v))):
+            raise ValueError("command 含 NaN/Inf: %r" % (v.tolist(),))
+        self._cmd = v.copy()
+        return self._cmd
+
+    @property
+    def command(self) -> np.ndarray:
+        """当前速度指令 (vx, vy, wz)。"""
+        return np.array(self._cmd, copy=True)
+
     # -------------------------------------------------------- 状态复位
 
     def reset(self) -> None:
