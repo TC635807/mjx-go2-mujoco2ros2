@@ -678,18 +678,30 @@ def main() -> int:
                     raise SystemExit("--remote-map 需要 3 段，例如 ly,lx,rx")
                 _gain = [float(x) for x in args.remote_gain]
 
+                _rc = {"n": 0}
+
                 def _on_remote(m, _lc=live, _axes=_axes, _gain=_gain,
                                _gate=_gate, _mask=_mask):
                     keys = int(m.keys) & 0xFFFF
+                    if _rc["n"] == 0:
+                        # 实机踩过：遥控器闲置时根本不发数据，n_sets 一直是 0，
+                        # 看上去像"代码没接上"。首帧一到就打印，一眼能区分。
+                        print("[ctrl] 遥控器首帧到达：keys=0x%04X lx=%+.2f ly=%+.2f rx=%+.2f ry=%+.2f"
+                              % (keys, float(m.lx), float(m.ly), float(m.rx), float(m.ry)),
+                              flush=True)
+                    _rc["n"] += 1
                     # 组合键（默认 L2+B）按住 = 纯阻尼急停；松手先归零再恢复
                     if _gate is not None and _mask:
                         _held = (keys & _mask) == _mask
                         if _held != _gate.active:
                             _gate.set_estop(_held)
-                            if not _held:
-                                _lc.set_command((0.0, 0.0, 0.0))
                         if _held:
+                            # 急停期间也要走一次 set_command：进度行的 rmt= 计的是
+                            # "收到多少帧遥控器数据"，否则按键急停时看起来像没收到。
+                            _lc.set_command((0.0, 0.0, 0.0))
                             return
+                        if _gate.active:
+                            _lc.set_command((0.0, 0.0, 0.0))
                     # L1 = bit1：按住即速度归零（不是 L3，不会卸力）
                     if keys & 0x02:
                         _lc.set_command((0.0, 0.0, 0.0))

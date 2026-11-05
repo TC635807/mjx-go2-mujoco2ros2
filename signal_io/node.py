@@ -532,11 +532,17 @@ class ControllerNode:
                     _why = ""
                     if health_state is not None and getattr(health_state, "reasons", None):
                         _why = "  why=" + ",".join(str(r) for r in health_state.reasons[:3])
-                    print("[ctrl] t=%5.1fs  n_state=%-6d n_cmd=%-6d %4.0f Hz  level=%-9s mode=%s%s"
+                    _rmt = getattr(self.ctrl, "n_sets", None)
+                    _rmt_txt = ("  rmt=%-4d" % _rmt) if _rmt is not None else ""
+                    if _rmt == 0 and t_ctrl > 3.0 and not getattr(self, "_warned_rmt", False):
+                        self._warned_rmt = True
+                        print("[ctrl] ⚠ 遥控器 3 s 内没有任何数据（/wirelesscontroller）："
+                              "推一下摇杆/唤醒遥控器，否则速度指令一直是 0", flush=True)
+                    print("[ctrl] t=%5.1fs  n_state=%-6d n_cmd=%-6d %4.0f Hz  level=%-9s mode=%s%s%s"
                           % (t_ctrl, self.n_state, self.n_cmd, _hz,
                              health_state.level_name if health_state is not None else "-",
                              self.supervisor.mode if self.supervisor is not None else "-",
-                             _why),
+                             _why, _rmt_txt),
                           flush=True)
             k += 1
         # ---- summary：排障时先看 n_state/n_cmd、health.level_hist、transport.bad_crc
