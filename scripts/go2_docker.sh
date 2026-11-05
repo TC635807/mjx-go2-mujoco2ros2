@@ -37,6 +37,15 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
+# 已经在容器里？容器内没有 docker 命令，而 /workspace 下正好有个 docker/ 目录，
+# 直接 exec docker 会报 "cannot execute: Is a directory"。这里给个人话提示。
+if ! command -v docker >/dev/null 2>&1; then
+  echo "[go2_docker] 没有 docker 命令 —— 你可能已经在容器里了。" >&2
+  echo "[go2_docker] 容器内直接跑，不要再套这层：" >&2
+  echo "    $*" >&2
+  exit 2
+fi
+
 # 只在真有 tty 时加 -t，否则管道/重定向场景会报 "the input device is not a TTY"
 TTY_FLAG=""
 if [ -t 0 ] && [ -t 1 ]; then TTY_FLAG="-t"; fi
