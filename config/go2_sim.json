@@ -1010,7 +1010,8 @@
     "mode_kd": 1,
     "crouch_depth": 0.35,
     "crouch_s": 2,
-    "l2_policy": "crouch_then_damp"
+    "l2_policy": "crouch_then_damp",
+    "damping_kd": 8
   },
   "health": {
     "estop_ms": 200,

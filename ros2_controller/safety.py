@@ -167,7 +167,8 @@ class SafetySupervisor:
                  mode_kp: float = 20.0, mode_kd: float = 1.0,
                  crouch_depth: float = 0.35, crouch_s: float = 2.0,
                  enabled: bool = True, q_slew_rate: Optional[float] = None,
-                 damp_kd: Optional[float] = None, estop_policy: str = "zero"):
+                 damp_kd: Optional[float] = None, estop_policy: str = "zero",
+                 damping_kd: Optional[float] = None):
         """建监督器。
 
         Args:
@@ -181,6 +182,7 @@ class SafetySupervisor:
                 真机默认由 run_controller 决定）。damp 用的 kd = damp_kd（显式给了
                 就用它），否则 DEFAULT_ESTOP_KD=8.0。
         """
+
         self.stand_pose = np.asarray(stand_pose, dtype=np.float64).reshape(-1).copy()
         if self.stand_pose.size != NUM_JOINT:
             raise ValueError("stand_pose 必须是 %d 维，得到 %d" % (NUM_JOINT, self.stand_pose.size))
@@ -189,7 +191,11 @@ class SafetySupervisor:
         self.mode_kp = float(mode_kp)
         self.mode_kd = float(mode_kd)
         # L2 damping 的 kd：默认跟 mode_kd 走（保持旧行为）；真机建议给 8。
-        self.damp_kd = float(mode_kd if damp_kd is None else damp_kd)
+        # 合并 origin/main 后同时接受 damping_kd（远端旧名），两个名字指向同一个值。
+        self.damp_kd = float(mode_kd if damping_kd is None else damping_kd)
+        if damp_kd is not None:
+            self.damp_kd = float(damp_kd)
+        self.damping_kd = self.damp_kd      # 兼容远端代码/测试里的旧属性名
         self.crouch_depth = float(crouch_depth)
         self.crouch_s = float(crouch_s)
         self.enabled = bool(enabled)

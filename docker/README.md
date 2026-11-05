@@ -344,3 +344,30 @@ ros2 launch ros2_ws/launch/real.launch.py controller:=policy duration:=30
 
 退出时控制器先发 100 ms 阻尼（kp=0/kd=8）再断流；任何异常先遥控器急停/断电。
 
+### 10.5 上机当天：一键预检 + runbook
+
+```bash
+cd ~/mjx-go2-mujoco2ros2
+bash docker/scripts/preflight_real.sh                      # 本机：docker/镜像/网卡/路由/内存/干扰
+NIC=<接狗网卡> bash docker/scripts/preflight_real.sh --with-dog   # 狗上电后：容器内 /lowstate + 500 Hz
+```
+
+预检通过后按 **[docs/sim2real-test-day.md](../docs/sim2real-test-day.md)** 走（接线 → 只读自检 →
+吊起 zero/stand → 落地 policy → 中止条件 → 故障树），那篇是给"明天就要上机"写的操作手册。
+
+### 10.6 在真实控制机上的实测记录（2026-11-04）
+
+控制机 `wyx-ThinkPad-T14-Gen-1`（Ubuntu 25.10，i5-10310U，6 GB，Docker 29.7.2）：
+
+| 项目 | 结果 |
+|---|---|
+| 镜像 `unitree-go2-ros2:humble` | ✅ 已导入（2.73 GB），容器启动正常 |
+| `verify_conformance.sh` | ✅ **PASS=14 FAIL=0 WARN=0**（含 sim_ros 三节点 launch、sim_sdk 官方 SDK 互通、CRC 互认） |
+| `tests/run_tests.py` | ✅ 14/14 |
+| `scripts/verify.py --target sim_ros / sim_udp` | ✅ 16/16 / 16/16 |
+| 真机档空跑（无狗） | ✅ 正确不动作：`n_cmd=0`、只打印"等待 /lowstate"，不会对未初始化的机器人发指令 |
+| 网卡自动纠正 | ✅ 配置里的 `eth0` 在本机不存在时自动改用持 `192.168.123.x` 的网卡（`signal_io/config.py::resolve_interface`） |
+| 网口协商 | ✅ 1000 Mb/s full duplex（早前一次 10 Mb/s 是网线问题，已换） |
+
+**注意**：同一条链路上还压着 WSL/Windows 侧的 SSH 通道，真机测试当天请按 §10.2-3 换口或用 USB 网卡。
+

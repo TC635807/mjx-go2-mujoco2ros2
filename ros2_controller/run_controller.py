@@ -763,7 +763,9 @@ def main() -> int:
             crouch_depth=float(s.get("crouch_depth", 0.35)), crouch_s=float(s.get("crouch_s", 2.0)),
             q_slew_rate=q_slew_rate,
             # L2 damping 的 kd：config 没给就沿用 mode_kd（旧行为）；真机建议 damp_kd=8。
+            # damping_kd 是 origin/main 侧的旧参数名，两个都给，谁读哪个都对。
             damp_kd=(float(s["damp_kd"]) if s.get("damp_kd") is not None else None),
+            damping_kd=(float(s["damping_kd"]) if s.get("damping_kd") is not None else None),
             estop_policy=estop_policy)
         if s.get("l2_policy"):
             supervisor.l2_policy = str(s["l2_policy"])
